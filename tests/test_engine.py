@@ -92,6 +92,31 @@ def test_missing_stance_and_condition_markers_return_none() -> None:
     assert find_condition(messages) is None
 
 
+def test_empty_stance_marker_resolves_to_no_override() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=] Are we ready?"}]
+    assert find_stance(messages) is None
+
+
+def test_empty_condition_marker_resolves_to_no_override() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_CONDITION=] Are we ready?"}
+    ]
+    assert find_condition(messages) is None
+
+
+def test_both_empty_stance_and_condition_markers_resolve_to_no_override() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=] [ARENA_CONDITION=] Are we ready?",
+        }
+    ]
+    assert find_stance(messages) is None
+    assert find_condition(messages) is None
+    # Empty markers must not change move selection.
+    assert select_move(latest_user_text(messages)) == Move.CLARIFY_BLOCKER
+
+
 def test_strip_actor_markers_from_messages_also_strips_stance_and_condition() -> None:
     messages = [
         {
@@ -101,6 +126,19 @@ def test_strip_actor_markers_from_messages_also_strips_stance_and_condition() ->
     ]
     cleaned = strip_actor_markers_from_messages(messages)
     assert cleaned[0]["content"] == "Are we ready?"
+
+
+def test_strip_actor_markers_from_messages_strips_empty_stance_and_condition() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=] [ARENA_CONDITION=] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+    assert "[ARENA_STANCE=" not in cleaned[0]["content"]
+    assert "[ARENA_CONDITION=" not in cleaned[0]["content"]
 
 
 def test_named_guidance_loads() -> None:

@@ -17,8 +17,8 @@ class Move(StrEnum):
 
 
 ACTOR_MARKER_RE = re.compile(r"\[ARENA_ACTOR=(priya|marcus|dana)\]", re.IGNORECASE)
-STANCE_MARKER_RE = re.compile(r"\[ARENA_STANCE=([A-Za-z_]+)\]", re.IGNORECASE)
-CONDITION_MARKER_RE = re.compile(r"\[ARENA_CONDITION=([A-Za-z_]+)\]", re.IGNORECASE)
+STANCE_MARKER_RE = re.compile(r"\[ARENA_STANCE=([A-Za-z_]*)\]", re.IGNORECASE)
+CONDITION_MARKER_RE = re.compile(r"\[ARENA_CONDITION=([A-Za-z_]*)\]", re.IGNORECASE)
 
 RULES: tuple[tuple[Move, tuple[str, ...]], ...] = (
     (
@@ -91,14 +91,14 @@ def parse_actor_marker(text: str) -> str | None:
 
 def parse_stance_marker(text: str) -> str | None:
     match = STANCE_MARKER_RE.search(text)
-    if not match:
+    if not match or not match.group(1):
         return None
     return match.group(1).upper()
 
 
 def parse_condition_marker(text: str) -> str | None:
     match = CONDITION_MARKER_RE.search(text)
-    if not match:
+    if not match or not match.group(1):
         return None
     return match.group(1).upper()
 
