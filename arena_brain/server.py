@@ -10,7 +10,6 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from arena_brain.actors import get_actor
 from arena_brain.engine import (
     build_behavior_instruction,
     find_actor_id,
@@ -80,13 +79,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
         )
 
     actor_id = find_actor_id(messages)
-    actor = get_actor(actor_id)
     user_text = latest_user_text(messages)
-    selected_move = select_move(user_text) if actor else None
+    selected_move = select_move(user_text) if actor_id else None
     stance_name = find_stance(messages)
     condition_name = find_condition(messages)
+    previous_move = None
     repeated_move = False
-    if actor and selected_move:
+    if actor_id and selected_move:
         previous_move = previous_move_for_actor(messages, actor_id)
         repeated_move = previous_move == selected_move
     clean_messages = strip_actor_markers_from_messages(messages)
@@ -94,9 +93,8 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     outbound = dict(payload)
     outbound["model"] = MODEL
     outbound["messages"] = clean_messages
-    if actor and selected_move:
+    if actor_id and selected_move:
         instruction = build_behavior_instruction(
-            actor=actor,
             selected_move=selected_move,
             move_guidance=MOVE_GUIDANCE[selected_move],
             stance_guidance=STANCE_GUIDANCE.get(stance_name) if stance_name else None,
@@ -117,12 +115,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
         status_code = response.status_code
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s stance=%s condition=%s selected_move=%s repeated_move=%s "
-            "latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s stance=%s condition=%s selected_move=%s previous_move=%s "
+            "repeated_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
             actor_id or "unknown",
             stance_name or "none",
             condition_name or "none",
             selected_move.value if selected_move else "pass_through",
+            previous_move.value if previous_move else "none",
             repeated_move,
             user_text[:120],
             MODEL,
@@ -133,12 +132,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     except httpx.HTTPError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s stance=%s condition=%s selected_move=%s repeated_move=%s "
-            "latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s stance=%s condition=%s selected_move=%s previous_move=%s "
+            "repeated_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
             actor_id or "unknown",
             stance_name or "none",
             condition_name or "none",
             selected_move.value if selected_move else "pass_through",
+            previous_move.value if previous_move else "none",
             repeated_move,
             user_text[:120],
             MODEL,

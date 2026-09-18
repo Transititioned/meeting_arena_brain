@@ -91,32 +91,42 @@ minimal modification.
 
 ### Stance and temporary condition (optional)
 
-Stance is an explicit, scenario-level overlay on an actor's baseline
-persona; temporary condition is a shorter-lived, per-scene modifier. Both
-are set explicitly — the brain never infers them — and both affect only how
-the response is rendered, not which conversational move is selected. Add
-either marker alongside the actor marker:
+Stance is an explicit, scenario-level overlay; temporary condition is a
+shorter-lived, per-scene modifier. Both are set explicitly — the brain never
+infers them — and both affect only how the response is rendered, not which
+conversational move is selected. Add either marker alongside the actor
+marker:
 
 ```text
-[ARENA_STANCE=guarded]
-[ARENA_STANCE=cooperative]
-[ARENA_STANCE=escalated]
+[ARENA_STANCE=neutral]
+[ARENA_STANCE=collaborative]
+[ARENA_STANCE=sceptical]
+[ARENA_STANCE=oppositional]
 
-[ARENA_CONDITION=rushed]
-[ARENA_CONDITION=frustrated]
-[ARENA_CONDITION=distracted]
+[ARENA_CONDITION=normal]
+[ARENA_CONDITION=pressured]
+[ARENA_CONDITION=frazzled]
+[ARENA_CONDITION=defensive]
 ```
 
 Valid values and their guidance text live in `config/stances/stances.yaml`
 and `config/conditions/conditions.yaml`. Both are closed vocabularies —
 extend them there, not with free text. An unrecognised or omitted value is
-treated as no override (`NEUTRAL`).
+treated as no override (`NEUTRAL`/`NORMAL`).
+
+The actor's persona lives in SillyTavern's own character definition, not in
+this repo — the brain only plumbs the actor ID through to select a move and
+look up stance/condition guidance; it does not inject any persona
+description of its own into the behavioural instruction.
 
 The brain also tracks, without any stored state, whether the current move is
 the same one this actor used on their immediately preceding turn (by
 deterministically re-running move selection over that turn from the resent
 conversation history). When it is, the rendering instruction is told to vary
 the wording rather than repeat it — move selection itself is unaffected.
+This depends on SillyTavern resending each historical turn's actor marker,
+not just the newest one; the server logs `previous_move=...` on every
+request so this can be checked against real traffic rather than assumed.
 
 ## Tests
 

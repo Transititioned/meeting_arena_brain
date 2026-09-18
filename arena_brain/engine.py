@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from arena_brain.actors import ACTORS, ActorProfile
+from arena_brain.actors import ACTORS
 
 
 class Move(StrEnum):
@@ -210,17 +210,13 @@ def load_move_guidance(path: Path) -> dict[Move, str]:
 
 
 def build_behavior_instruction(
-    actor: ActorProfile,
     selected_move: Move,
     move_guidance: str,
     stance_guidance: str | None = None,
     condition_guidance: str | None = None,
     repeated_move: bool = False,
 ) -> str:
-    parts = [
-        "Meeting Arena behavioural instruction.",
-        f"Actor profile: {actor.as_instruction()}.",
-    ]
+    parts = ["Meeting Arena behavioural instruction."]
     if stance_guidance:
         parts.append(f"Current stance: {stance_guidance}")
     if condition_guidance:
