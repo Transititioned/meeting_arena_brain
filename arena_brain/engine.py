@@ -91,6 +91,18 @@ def strip_actor_markers(text: str) -> str:
     return ACTOR_MARKER_RE.sub("", text).strip()
 
 
+def strip_actor_markers_from_messages(
+    messages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    cleaned: list[dict[str, Any]] = []
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            message = {**message, "content": strip_actor_markers(content)}
+        cleaned.append(message)
+    return cleaned
+
+
 def find_actor_id(messages: list[dict[str, Any]]) -> str | None:
     for message in messages:
         content = message.get("content")

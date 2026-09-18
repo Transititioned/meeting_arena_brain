@@ -17,6 +17,7 @@ from arena_brain.engine import (
     latest_user_text,
     load_move_guidance,
     select_move,
+    strip_actor_markers_from_messages,
 )
 
 
@@ -63,20 +64,31 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     if not isinstance(messages, list):
         raise HTTPException(status_code=400, detail="messages must be a list")
 
+    if payload.get("stream"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Streaming is not supported by this proxy. "
+                "Turn off Streaming in SillyTavern's connection settings."
+            ),
+        )
+
     actor_id = find_actor_id(messages)
     actor = get_actor(actor_id)
     user_text = latest_user_text(messages)
     selected_move = select_move(user_text) if actor else None
+    clean_messages = strip_actor_markers_from_messages(messages)
 
     outbound = dict(payload)
     outbound["model"] = MODEL
+    outbound["messages"] = clean_messages
     if actor and selected_move:
         instruction = build_behavior_instruction(
             actor=actor,
             selected_move=selected_move,
             move_guidance=MOVE_GUIDANCE[selected_move],
         )
-        outbound["messages"] = [{"role": "system", "content": instruction}, *messages]
+        outbound["messages"] = [{"role": "system", "content": instruction}, *clean_messages]
 
     started = time.perf_counter()
     status_code = 0

@@ -15,20 +15,31 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Supply the OpenAI key locally without committing it:
+Supply the OpenAI key locally without committing it. The app does **not**
+load `.env` automatically — set the real key as an environment variable in
+the same terminal session you run the server from.
+
+Command Prompt (cmd.exe):
+
+```cmd
+set OPENAI_API_KEY=sk-your-real-key
+```
+
+PowerShell:
+
+```powershell
+$env:OPENAI_API_KEY="sk-your-real-key"
+```
+
+`.env.example` is only a template for keeping the key somewhere locally if
+you want one; copying it to `.env` does not make the app read it:
 
 ```cmd
 copy .env.example .env
 notepad .env
 ```
 
-Then either load it in the current terminal:
-
-```cmd
-set OPENAI_API_KEY=sk-your-real-key
-```
-
-Or use your preferred local environment variable manager. Never commit `.env`.
+Never commit `.env`.
 
 ## Run locally
 
@@ -58,9 +69,16 @@ API type: Chat Completions / OpenAI-compatible
 Base URL: http://127.0.0.1:8765/v1
 Model: gpt-4o-mini
 API key: any placeholder value in SillyTavern; the proxy reads OPENAI_API_KEY locally
+Streaming: OFF
 ```
 
-Include one actor marker somewhere in the incoming conversation:
+This proxy does not support streaming responses yet. Leave Streaming off in
+SillyTavern's connection settings — a `stream: true` request is rejected
+with a clear `400` error rather than being silently mishandled.
+
+Actor markers are stripped before the conversation is forwarded to OpenAI;
+they are plumbing for move selection, not dialogue. Include one actor marker
+somewhere in the incoming conversation:
 
 ```text
 [ARENA_ACTOR=priya]

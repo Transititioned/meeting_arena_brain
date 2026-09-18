@@ -7,6 +7,7 @@ from arena_brain.engine import (
     latest_user_text,
     load_move_guidance,
     select_move,
+    strip_actor_markers_from_messages,
 )
 
 
@@ -52,6 +53,17 @@ def test_unknown_actor_degrades_safely() -> None:
     messages = [{"role": "user", "content": "[ARENA_ACTOR=unknown] Are we ready?"}]
     assert find_actor_id(messages) is None
     assert get_actor(find_actor_id(messages)) is None
+
+
+def test_strip_actor_markers_from_messages() -> None:
+    messages = [
+        {"role": "system", "content": "unrelated"},
+        {"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"},
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[1]["content"] == "Are we ready?"
+    assert "[ARENA_ACTOR=" not in cleaned[0]["content"]
+    assert messages[1]["content"] == "[ARENA_ACTOR=priya] Are we ready?"
 
 
 def test_move_guidance_loads() -> None:
