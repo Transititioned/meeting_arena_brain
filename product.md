@@ -32,6 +32,10 @@ This is not a chatbot application and does not replace SillyTavern.
 
 
 
+For the authoritative, current description of how behaviour is composed (persona vs. stance vs. temporary condition vs. deterministic move vs. rendering), see \`SEMANTIC\_ARCHITECTURE.md\` at the repository root. Where anything below conflicts with it, \`SEMANTIC\_ARCHITECTURE.md\` wins.
+
+
+
 \---
 
 
@@ -134,25 +138,27 @@ For each actor turn:
 
 
 
-1\. receive the existing SillyTavern conversation
+1\. receive the existing SillyTavern conversation (which already carries that actor's persona via the SillyTavern character card)
 
-2\. identify the current actor
+2\. identify the current actor, for routing only — not to look up a persona description
 
-3\. inspect the latest user utterance
+3\. read any explicit stance/temporary-condition markers (never inferred)
 
-4\. identify simple conversational signals
+4\. inspect the latest user utterance
 
 5\. select an appropriate conversational move deterministically
 
-6\. add a compact behavioural instruction
+6\. check whether this actor is repeating their immediately preceding move, from the resent conversation history only, to vary wording
 
-7\. forward the request to the remote LLM
+7\. add a compact behavioural instruction covering stance, temporary condition, the selected move, and its guidance — never a persona description
 
-8\. return the normal OpenAI-compatible response to SillyTavern
+8\. forward the request to the remote LLM
+
+9\. return the normal OpenAI-compatible response to SillyTavern
 
 
 
-The remote LLM should not need to rediscover the workplace strategy from scratch.
+The remote LLM should not need to rediscover the workplace strategy from scratch. See \`SEMANTIC\_ARCHITECTURE.md\` for full ownership boundaries.
 
 
 
@@ -161,6 +167,10 @@ The remote LLM should not need to rediscover the workplace strategy from scratch
 
 
 \## Initial Actors
+
+
+
+These bios are the design reference that seeded each actor's SillyTavern character card, and \`arena\_brain/actors.py\` still keeps them as a routing table (which actor IDs the brain recognises). They are historical/reference material, not something the brain injects into the prompt at runtime — the actor's persona is expressed through the SillyTavern character card itself, not through this list. See \`SEMANTIC\_ARCHITECTURE.md\` for current ownership boundaries.
 
 
 
@@ -424,17 +434,23 @@ Keep move selection isolated so it can later become a weighted recommender.
 
 
 
-The LLM should normally receive only a compact instruction containing:
+The brain's own added instruction should normally contain only:
 
 
 
-\- actor identity
+\- stance overlay, if any (explicit, closed vocabulary)
 
-\- actor behavioural profile
+\- temporary-condition overlay, if any (explicit, closed vocabulary)
 
 \- selected move
 
 \- concise move guidance
+
+\- a note to vary wording if this move repeats the actor's immediately preceding one
+
+
+
+It should \*\*not\*\* contain an actor identity/behavioural-profile description — that persona is already present in the conversation via the SillyTavern character card, and duplicating it here is exactly the "second persona engine" this architecture avoids. See \`SEMANTIC\_ARCHITECTURE.md\`.
 
 
 
@@ -470,13 +486,17 @@ Generated dialogue should:
 
 
 
+This diagram is a quick-reference summary only. \`SEMANTIC\_ARCHITECTURE.md\` at the repository root is the authoritative, current description — read it before changing persona, stance, condition, move selection, or prompt composition.
+
+
+
 ```text
 
-SillyTavern
+SillyTavern (owns the actor's persona: voice, cadence, dialogue examples)
 
 &#x20;   |
 
-&#x20;   | OpenAI-compatible request
+&#x20;   | OpenAI-compatible request, carrying [ARENA_ACTOR=...], optional [ARENA_STANCE=...] / [ARENA_CONDITION=...]
 
 &#x20;   v
 
@@ -484,13 +504,17 @@ Meeting Arena Brain
 
 &#x20;   |
 
-&#x20;   | identify actor
+&#x20;   | identify actor (routing only, no persona lookup)
+
+&#x20;   | read stance / temporary-condition markers (explicit, never inferred)
 
 &#x20;   | inspect latest user turn
 
-&#x20;   | deterministic move selection
+&#x20;   | deterministic move selection (unaffected by stance/condition)
 
-&#x20;   | inject small behavioural instruction
+&#x20;   | check for a repeated move from resent history (wording variation only)
+
+&#x20;   | inject compact instruction: stance + condition + move + guidance — no persona text
 
 &#x20;   v
 
@@ -498,7 +522,7 @@ OpenAI / remote LLM
 
 &#x20;   |
 
-&#x20;   | natural-language rendering
+&#x20;   | natural-language rendering (one call)
 
 &#x20;   v
 
@@ -511,4 +535,6 @@ Meeting Arena Brain
 &#x20;   v
 
 SillyTavern
+
+```
 
