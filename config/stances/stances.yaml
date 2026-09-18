@@ -1,0 +1,8 @@
+NEUTRAL:
+  No stance override. Behave according to the actor's baseline profile only.
+GUARDED:
+  Keep responses measured and non-committal. Protect position before offering detail. Slower to concede ground than usual.
+COOPERATIVE:
+  Lean toward finding common ground quickly. Offer help or alternatives readily. Warmer than baseline.
+ESCALATED:
+  Pressure is closer to the surface than usual. Less patient with delay or ambiguity. More direct follow-up questions.

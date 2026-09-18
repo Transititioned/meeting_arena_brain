@@ -4,8 +4,12 @@ from arena_brain.actors import get_actor
 from arena_brain.engine import (
     Move,
     find_actor_id,
+    find_condition,
+    find_stance,
     latest_user_text,
     load_move_guidance,
+    load_named_guidance,
+    previous_move_for_actor,
     select_move,
     strip_actor_markers_from_messages,
 )
@@ -69,4 +73,59 @@ def test_strip_actor_markers_from_messages() -> None:
 def test_move_guidance_loads() -> None:
     guidance = load_move_guidance(Path("config/moves/moves.yaml"))
     assert "prevents progress" in guidance[Move.CLARIFY_BLOCKER]
+
+
+def test_stance_and_condition_marker_parsing() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=guarded] [ARENA_CONDITION=rushed] Are we ready?",
+        }
+    ]
+    assert find_stance(messages) == "GUARDED"
+    assert find_condition(messages) == "RUSHED"
+
+
+def test_missing_stance_and_condition_markers_return_none() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
+    assert find_stance(messages) is None
+    assert find_condition(messages) is None
+
+
+def test_strip_actor_markers_from_messages_also_strips_stance_and_condition() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=guarded] [ARENA_CONDITION=rushed] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+
+
+def test_named_guidance_loads() -> None:
+    guidance = load_named_guidance(Path("config/stances/stances.yaml"))
+    assert "measured" in guidance["GUARDED"]
+
+
+def test_previous_move_for_actor_none_on_first_turn() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
+    assert previous_move_for_actor(messages, "priya") is None
+
+
+def test_previous_move_for_actor_recomputes_deterministically() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"},
+        {"role": "assistant", "content": "We still have two open items."},
+        {"role": "user", "content": "[ARENA_ACTOR=priya] Can you explain what you mean?"},
+    ]
+    assert previous_move_for_actor(messages, "priya") == Move.CLARIFY_BLOCKER
+
+
+def test_previous_move_for_actor_ignores_other_actors() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"},
+        {"role": "user", "content": "[ARENA_ACTOR=marcus] What's the evidence?"},
+    ]
+    assert previous_move_for_actor(messages, "priya") is None
 

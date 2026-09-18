@@ -14,8 +14,12 @@ from arena_brain.actors import get_actor
 from arena_brain.engine import (
     build_behavior_instruction,
     find_actor_id,
+    find_condition,
+    find_stance,
     latest_user_text,
     load_move_guidance,
+    load_named_guidance,
+    previous_move_for_actor,
     select_move,
     strip_actor_markers_from_messages,
 )
@@ -25,6 +29,8 @@ OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 MODEL = "gpt-4o-mini"
 ROOT = Path(__file__).resolve().parents[1]
 MOVE_GUIDANCE = load_move_guidance(ROOT / "config" / "moves" / "moves.yaml")
+STANCE_GUIDANCE = load_named_guidance(ROOT / "config" / "stances" / "stances.yaml")
+CONDITION_GUIDANCE = load_named_guidance(ROOT / "config" / "conditions" / "conditions.yaml")
 
 app = FastAPI(title="Meeting Arena Brain")
 logger = logging.getLogger("arena_brain")
@@ -77,6 +83,12 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     actor = get_actor(actor_id)
     user_text = latest_user_text(messages)
     selected_move = select_move(user_text) if actor else None
+    stance_name = find_stance(messages)
+    condition_name = find_condition(messages)
+    repeated_move = False
+    if actor and selected_move:
+        previous_move = previous_move_for_actor(messages, actor_id)
+        repeated_move = previous_move == selected_move
     clean_messages = strip_actor_markers_from_messages(messages)
 
     outbound = dict(payload)
@@ -87,6 +99,9 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
             actor=actor,
             selected_move=selected_move,
             move_guidance=MOVE_GUIDANCE[selected_move],
+            stance_guidance=STANCE_GUIDANCE.get(stance_name) if stance_name else None,
+            condition_guidance=CONDITION_GUIDANCE.get(condition_name) if condition_name else None,
+            repeated_move=repeated_move,
         )
         outbound["messages"] = [{"role": "system", "content": instruction}, *clean_messages]
 
@@ -102,9 +117,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
         status_code = response.status_code
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s selected_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s stance=%s condition=%s selected_move=%s repeated_move=%s "
+            "latest_user=%r model=%s http_result=%s elapsed_ms=%s",
             actor_id or "unknown",
+            stance_name or "none",
+            condition_name or "none",
             selected_move.value if selected_move else "pass_through",
+            repeated_move,
             user_text[:120],
             MODEL,
             status_code,
@@ -114,9 +133,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     except httpx.HTTPError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s selected_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s stance=%s condition=%s selected_move=%s repeated_move=%s "
+            "latest_user=%r model=%s http_result=%s elapsed_ms=%s",
             actor_id or "unknown",
+            stance_name or "none",
+            condition_name or "none",
             selected_move.value if selected_move else "pass_through",
+            repeated_move,
             user_text[:120],
             MODEL,
             status_code or "transport_error",

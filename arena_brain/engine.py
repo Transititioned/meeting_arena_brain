@@ -17,6 +17,8 @@ class Move(StrEnum):
 
 
 ACTOR_MARKER_RE = re.compile(r"\[ARENA_ACTOR=(priya|marcus|dana)\]", re.IGNORECASE)
+STANCE_MARKER_RE = re.compile(r"\[ARENA_STANCE=([A-Za-z_]+)\]", re.IGNORECASE)
+CONDITION_MARKER_RE = re.compile(r"\[ARENA_CONDITION=([A-Za-z_]+)\]", re.IGNORECASE)
 
 RULES: tuple[tuple[Move, tuple[str, ...]], ...] = (
     (
@@ -87,8 +89,25 @@ def parse_actor_marker(text: str) -> str | None:
     return match.group(1).lower()
 
 
+def parse_stance_marker(text: str) -> str | None:
+    match = STANCE_MARKER_RE.search(text)
+    if not match:
+        return None
+    return match.group(1).upper()
+
+
+def parse_condition_marker(text: str) -> str | None:
+    match = CONDITION_MARKER_RE.search(text)
+    if not match:
+        return None
+    return match.group(1).upper()
+
+
 def strip_actor_markers(text: str) -> str:
-    return ACTOR_MARKER_RE.sub("", text).strip()
+    text = ACTOR_MARKER_RE.sub("", text)
+    text = STANCE_MARKER_RE.sub("", text)
+    text = CONDITION_MARKER_RE.sub("", text)
+    return text.strip()
 
 
 def strip_actor_markers_from_messages(
@@ -113,6 +132,26 @@ def find_actor_id(messages: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def find_stance(messages: list[dict[str, Any]]) -> str | None:
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            stance = parse_stance_marker(content)
+            if stance:
+                return stance
+    return None
+
+
+def find_condition(messages: list[dict[str, Any]]) -> str | None:
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            condition = parse_condition_marker(content)
+            if condition:
+                return condition
+    return None
+
+
 def latest_user_text(messages: list[dict[str, Any]]) -> str:
     for message in reversed(messages):
         if message.get("role") == "user" and isinstance(message.get("content"), str):
@@ -120,9 +159,33 @@ def latest_user_text(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
-def load_move_guidance(path: Path) -> dict[Move, str]:
-    guidance: dict[Move, str] = {}
-    current_key: Move | None = None
+def previous_move_for_actor(messages: list[dict[str, Any]], actor_id: str) -> Move | None:
+    """Deterministically recompute the move this actor's previous turn triggered.
+
+    No move history is stored anywhere: SillyTavern resends the full
+    conversation on every call, and each of the actor's own earlier turns is
+    still marked with `[ARENA_ACTOR=...]` in that resent history, so re-running
+    `select_move` over the second-to-last one reproduces exactly what fired
+    for it originally.
+    """
+    own_texts: list[str] = []
+    for message in messages:
+        if message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if not isinstance(content, str):
+            continue
+        if parse_actor_marker(content) == actor_id:
+            own_texts.append(strip_actor_markers(content))
+
+    if len(own_texts) < 2:
+        return None
+    return select_move(own_texts[-2])
+
+
+def load_named_guidance(path: Path) -> dict[str, str]:
+    guidance: dict[str, str] = {}
+    current_key: str | None = None
     current_lines: list[str] = []
 
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -131,7 +194,7 @@ def load_move_guidance(path: Path) -> dict[Move, str]:
         if not raw_line.startswith((" ", "\t")) and raw_line.endswith(":"):
             if current_key is not None:
                 guidance[current_key] = " ".join(current_lines).strip()
-            current_key = Move(raw_line[:-1])
+            current_key = raw_line[:-1]
             current_lines = []
             continue
         if current_key is not None:
@@ -142,18 +205,38 @@ def load_move_guidance(path: Path) -> dict[Move, str]:
     return guidance
 
 
+def load_move_guidance(path: Path) -> dict[Move, str]:
+    return {Move(name): guidance for name, guidance in load_named_guidance(path).items()}
+
+
 def build_behavior_instruction(
     actor: ActorProfile,
     selected_move: Move,
     move_guidance: str,
+    stance_guidance: str | None = None,
+    condition_guidance: str | None = None,
+    repeated_move: bool = False,
 ) -> str:
-    return (
-        "Meeting Arena behavioural instruction. "
-        f"Actor profile: {actor.as_instruction()}. "
-        f"Selected move: {selected_move.value}. "
-        f"Move guidance: {move_guidance}. "
+    parts = [
+        "Meeting Arena behavioural instruction.",
+        f"Actor profile: {actor.as_instruction()}.",
+    ]
+    if stance_guidance:
+        parts.append(f"Current stance: {stance_guidance}")
+    if condition_guidance:
+        parts.append(f"Temporary condition: {condition_guidance}")
+    parts.append(f"Selected move: {selected_move.value}.")
+    parts.append(f"Move guidance: {move_guidance}.")
+    if repeated_move:
+        parts.append(
+            "This is the same conversational move the actor used last turn: "
+            "vary the wording and sentence structure noticeably, do not repeat "
+            "the same phrasing."
+        )
+    parts.append(
         "Rendering constraints: normal workplace language; no theatrical roleplay; "
         "no caricature; do not announce personality traits; pressure should often "
         "remain implicit; react to what was actually said; maximum 1-2 short paragraphs."
     )
+    return " ".join(parts)
 

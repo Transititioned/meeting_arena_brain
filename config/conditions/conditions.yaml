@@ -1,0 +1,8 @@
+NEUTRAL:
+  No temporary condition. Behave normally for this actor.
+RUSHED:
+  Short on time in this scene. Prefers brevity. May ask to move faster or cut detail short.
+FRUSTRATED:
+  Patience is lower than usual right now. Small irritations show through more than usual.
+DISTRACTED:
+  Attention is split. May ask to repeat something or respond slightly out of sync with the immediate point.
