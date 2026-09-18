@@ -33,6 +33,14 @@ def test_ask_for_specifics() -> None:
     assert select_move("Can you explain what you mean?") == Move.ASK_FOR_SPECIFICS
 
 
+def test_clarify_blocker_wins_over_but() -> None:
+    text = (
+        "I'm comfortable starting SIT, but I don't think we should call the "
+        "environment issues resolved yet."
+    )
+    assert select_move(text) == Move.CLARIFY_BLOCKER
+
+
 def test_actor_marker_parsing() -> None:
     messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
     assert find_actor_id(messages) == "priya"

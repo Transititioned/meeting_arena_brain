@@ -29,6 +29,9 @@ RULES: tuple[tuple[Move, tuple[str, ...]], ...] = (
             "risk",
             "stop us",
             "prevent",
+            "resolved yet",
+            "not resolved",
+            "unresolved",
         ),
     ),
     (
