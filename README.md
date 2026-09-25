@@ -5,8 +5,9 @@ OpenAI-compatible proxy for SillyTavern, chooses a deterministic conversational
 move from the latest user utterance, injects one compact behavioural instruction,
 and forwards the request to OpenAI `gpt-4o-mini`.
 
-> **Before changing persona, stance, condition, move selection, or prompt
-> composition, read [`SEMANTIC_ARCHITECTURE.md`](SEMANTIC_ARCHITECTURE.md).**
+> **Before changing persona, power difficulty, stance, condition, move
+> selection, or prompt composition, read
+> [`SEMANTIC_ARCHITECTURE.md`](SEMANTIC_ARCHITECTURE.md).**
 > It is the authoritative record of which layer owns what, and a lot of
 > iterative work went into keeping those layers separate — please don't
 > re-merge them without reading it first.
@@ -97,9 +98,9 @@ This proxy does not support streaming responses yet. Leave Streaming off in
 SillyTavern's connection settings — a `stream: true` request is rejected
 with a clear `400` error rather than being silently mishandled.
 
-Actor, stance, and condition markers are stripped before the conversation is
-forwarded to OpenAI; they are plumbing for the brain, not dialogue. Include
-one actor marker somewhere in the incoming conversation:
+Actor, power, stance, and condition markers are stripped before the
+conversation is forwarded to OpenAI; they are plumbing for the brain, not
+dialogue. Include one actor marker somewhere in the incoming conversation:
 
 ```text
 [ARENA_ACTOR=priya]
@@ -109,6 +110,29 @@ one actor marker somewhere in the incoming conversation:
 
 If no recognised marker is present, the proxy still forwards the request with
 minimal modification.
+
+### Power difficulty (optional, metadata only for now)
+
+Power difficulty is a scenario-level control marker describing how
+politically difficult the room is — independent of any actor's persona,
+stance, or condition:
+
+```text
+[ARENA_POWER=green]
+[ARENA_POWER=amber]
+[ARENA_POWER=red]
+```
+
+Valid values and their definitions live in `config/power/power.yaml` — a
+closed vocabulary, same as stance and condition. An unrecognised or omitted
+value is treated as no override.
+
+**This is plumbing only in this iteration.** The marker is parsed, the
+latest applicable one in history wins, it's stripped before forwarding
+upstream, and it's logged (`power=GREEN` / `power=AMBER` / `power=RED` /
+`power=none`) — but it does not yet affect move selection, stance,
+condition, repeated-move logic, or the LLM prompt in any way. See
+`SEMANTIC_ARCHITECTURE.md` for the full rationale.
 
 ### Stance and temporary condition (optional)
 

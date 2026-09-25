@@ -5,6 +5,7 @@ from arena_brain.engine import (
     Move,
     find_actor_id,
     find_condition,
+    find_power,
     find_stance,
     latest_user_text,
     load_move_guidance,
@@ -182,6 +183,100 @@ def test_strip_actor_markers_from_messages_strips_empty_stance_and_condition() -
 def test_named_guidance_loads() -> None:
     guidance = load_named_guidance(Path("config/stances/stances.yaml"))
     assert "measured" in guidance["SCEPTICAL"]
+
+
+def test_power_guidance_loads() -> None:
+    guidance = load_named_guidance(Path("config/power/power.yaml"))
+    assert "AMBER" in guidance
+    assert "GREEN" in guidance
+    assert "RED" in guidance
+
+
+def test_power_marker_parsing_green() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=green] Are we ready?"}]
+    assert find_power(messages) == "GREEN"
+
+
+def test_power_marker_parsing_amber() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=amber] Are we ready?"}]
+    assert find_power(messages) == "AMBER"
+
+
+def test_power_marker_parsing_red() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=red] Are we ready?"}]
+    assert find_power(messages) == "RED"
+
+
+def test_power_marker_case_insensitivity() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=AmBeR] Are we ready?"}]
+    assert find_power(messages) == "AMBER"
+
+
+def test_missing_power_marker_returns_none() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
+    assert find_power(messages) is None
+
+
+def test_empty_power_marker_resolves_to_no_override() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=] Are we ready?"}]
+    assert find_power(messages) is None
+
+
+def test_unknown_power_value_resolves_to_no_override() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_POWER=blue] Are we ready?"}]
+    assert find_power(messages) is None
+
+
+def test_latest_power_marker_wins_in_multi_message_history() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=green] Are we ready to start SIT?",
+        },
+        {"role": "assistant", "content": "We still have two environment issues open."},
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=red] So can we call this ready to go?",
+        },
+    ]
+    assert find_power(messages) == "RED"
+
+
+def test_power_marker_stripped_from_messages() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=amber] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+    assert "[ARENA_POWER=" not in cleaned[0]["content"]
+
+
+def test_unknown_power_marker_still_stripped_from_messages() -> None:
+    """An unrecognised power value still resolves to no override, but the
+    bracketed marker itself must never leak into the outbound dialogue."""
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=blue] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+    assert "[ARENA_POWER=" not in cleaned[0]["content"]
+
+
+def test_power_metadata_does_not_change_move_selection() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=red] I'm comfortable starting SIT, "
+            "but I don't think we should call the environment issues resolved yet.",
+        }
+    ]
+    assert select_move(latest_user_text(messages)) == Move.CLARIFY_BLOCKER
 
 
 def test_previous_move_for_actor_none_on_first_turn() -> None:

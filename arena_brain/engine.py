@@ -19,6 +19,8 @@ class Move(StrEnum):
 ACTOR_MARKER_RE = re.compile(r"\[ARENA_ACTOR=(priya|marcus|dana)\]", re.IGNORECASE)
 STANCE_MARKER_RE = re.compile(r"\[ARENA_STANCE=([A-Za-z_]*)\]", re.IGNORECASE)
 CONDITION_MARKER_RE = re.compile(r"\[ARENA_CONDITION=([A-Za-z_]*)\]", re.IGNORECASE)
+POWER_MARKER_RE = re.compile(r"\[ARENA_POWER=([A-Za-z_]*)\]", re.IGNORECASE)
+VALID_POWER_LEVELS = frozenset({"GREEN", "AMBER", "RED"})
 
 RULES: tuple[tuple[Move, tuple[str, ...]], ...] = (
     (
@@ -103,10 +105,22 @@ def parse_condition_marker(text: str) -> str | None:
     return match.group(1).upper()
 
 
+def parse_power_marker(text: str) -> str | None:
+    """Parse [ARENA_POWER=...]. Unlike stance/condition, an unrecognised
+    value resolves to None here (not just at guidance lookup) - power's
+    closed vocabulary is enforced at parse time, same as actor markers."""
+    match = POWER_MARKER_RE.search(text)
+    if not match or not match.group(1):
+        return None
+    value = match.group(1).upper()
+    return value if value in VALID_POWER_LEVELS else None
+
+
 def strip_actor_markers(text: str) -> str:
     text = ACTOR_MARKER_RE.sub("", text)
     text = STANCE_MARKER_RE.sub("", text)
     text = CONDITION_MARKER_RE.sub("", text)
+    text = POWER_MARKER_RE.sub("", text)
     return text.strip()
 
 
@@ -155,6 +169,19 @@ def find_condition(messages: list[dict[str, Any]]) -> str | None:
             condition = parse_condition_marker(content)
             if condition:
                 return condition
+    return None
+
+
+def find_power(messages: list[dict[str, Any]]) -> str | None:
+    """Scenario-level power-difficulty marker: GREEN/AMBER/RED, latest
+    applicable (recognised) marker wins. Control metadata only in this
+    iteration - see SEMANTIC_ARCHITECTURE.md."""
+    for message in reversed(messages):
+        content = message.get("content")
+        if isinstance(content, str):
+            power = parse_power_marker(content)
+            if power:
+                return power
     return None
 
 

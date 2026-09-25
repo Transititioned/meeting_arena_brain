@@ -14,6 +14,8 @@ regression in this codebase.
 ```
 SILLYTAVERN PERSONA          stable person + voice + examples
         +
+POWER DIFFICULTY             explicit political difficulty of the scenario/room
+        +
 STANCE                       explicit attitude toward the current proposal
         +
 TEMPORARY CONDITION          explicit short-lived modifier
@@ -25,11 +27,17 @@ LIGHTWEIGHT CONTEXT          optional rendering variation only
 REMOTE LLM                   renders one believable response
 ```
 
+**Iteration-one note:** power difficulty is defined and plumbed (parsed,
+tracked, logged) but does **not** yet feed the remote LLM or influence any
+other layer — see section 4. It sits here in the stack conceptually, ahead
+of where later iterations will wire it in.
+
 ## 2. Ownership boundaries
 
 | Concern | Owner | Where |
 |---|---|---|
 | Stable persona (who someone is, voice, cadence, normal challenge style, dialogue examples) | SillyTavern | The character card, not this repo |
+| Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata (iteration one: not yet consumed downstream) | `config/power/power.yaml` |
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
 | Move selection (the strategic conversational action) | This repo, deterministic Python | `arena_brain/engine.py::select_move` |
@@ -44,9 +52,25 @@ description belongs in the SillyTavern character card.
 
 ## 3. Closed vocabularies
 
-Stance and temporary condition are each a small, closed, named vocabulary —
-never free text, never LLM-inferred. An unrecognised or missing value
-degrades safely to no override.
+Power difficulty, stance, and temporary condition are each a small, closed,
+named vocabulary — never free text, never LLM-inferred. An unrecognised or
+missing value degrades safely to no override.
+
+**Power difficulty** (`config/power/power.yaml`) — how politically difficult
+the scenario/room is, independent of any single actor's persona, stance, or
+condition:
+
+| Value | Meaning |
+|---|---|
+| `GREEN` | Normal organisational hierarchy. Bosses are still bosses and people protect their own responsibilities, but disagreement is mainly substantive rather than political |
+| `AMBER` | Status behaviour is present — playing to the boss, seeking visibility, subtle positioning, offloading awkward work, letting someone else take political heat — but stays plausible, socially normal and deniable rather than overtly hostile |
+| `RED` | A credible political threat is present — scope/authority encroachment, publicly distancing from a failure, undermining someone's standing, joining a pile-on, transferring accountability while keeping influence — while still reading as believable workplace politics, not cartoon villainy |
+
+**Iteration-one rule:** `ARENA_POWER` is control metadata only. It is parsed,
+tracked, and logged, but must not affect move selection, stance, condition,
+repeated-move logic, or rendering, and must not inject any guidance into the
+LLM prompt. Later tasks will decide how GREEN/AMBER/RED actually affect
+simulation behaviour — do not pre-empt that here.
 
 **Stance** (`config/stances/stances.yaml`) — the actor's attitude toward the
 current proposal/discussion, independent of their stable personality:
@@ -75,6 +99,10 @@ not replace the person with a caricature.
 
 ## 4. Iteration-one rules
 
+- **Power difficulty does not change move selection, stance, condition,
+  repeated-move logic, or rendering.** It is parsed and logged (`power=...`)
+  and nothing else for now — pure control metadata, established ahead of the
+  later task that decides how it actually affects behaviour.
 - **Stance does not change move selection.** Temporary condition does not
   change move selection. They only change how the selected move is
   expressed.
@@ -103,15 +131,16 @@ content, e.g.:
 
 ```
 [ARENA_ACTOR=priya]
+[ARENA_POWER=amber]
 [ARENA_STANCE=sceptical]
 [ARENA_CONDITION=frazzled]
 ```
 
-The brain detects these (`find_actor_id`, `find_stance`, `find_condition`)
-and strips them (`strip_actor_markers`) before the conversation is
-forwarded upstream — they are plumbing, never dialogue. An empty value
-(`[ARENA_STANCE=]`), a missing marker, or an unrecognised name all degrade
-safely to no override, not an error.
+The brain detects these (`find_actor_id`, `find_power`, `find_stance`,
+`find_condition`) and strips them (`strip_actor_markers`) before the
+conversation is forwarded upstream — they are plumbing, never dialogue. An
+empty value (`[ARENA_STANCE=]`), a missing marker, or an unrecognised name
+all degrade safely to no override, not an error.
 
 SillyTavern owns the user-facing control surface that sets these markers
 (Quick Reply buttons / chat variables in the current MVP direction). No
@@ -128,6 +157,10 @@ Do **not**:
 - Infer stance or temporary condition using an LLM.
 - Add an LLM call before the renderer.
 - Make stance/condition affect move selection in iteration one.
+- Let power difficulty influence move selection, stance, condition,
+  repeated-move logic, rendering, or Coach behaviour until a later task
+  explicitly authorises it. Iteration one is parsing, tracking, and logging
+  only.
 - Make "difficult" behaviour synonymous with hostility.
 - Create one persona per stance/condition combination.
 - Introduce session storage solely to support repeat-move behaviour.
