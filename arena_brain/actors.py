@@ -14,14 +14,6 @@ class ActorProfile:
     challenge_style: str
     action_bias: str
 
-    def as_instruction(self) -> str:
-        return (
-            f"actor={self.actor_id}; role={self.role}; authority={self.authority}; "
-            f"pace={self.pace}; detail_appetite={self.detail_appetite}; "
-            f"warmth={self.warmth}; challenge_style={self.challenge_style}; "
-            f"action_bias={self.action_bias}"
-        )
-
 
 ACTORS: dict[str, ActorProfile] = {
     "priya": ActorProfile(

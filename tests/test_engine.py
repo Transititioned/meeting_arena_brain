@@ -53,6 +53,26 @@ def test_actor_marker_parsing() -> None:
     assert latest_user_text(messages) == "Are we ready?"
 
 
+def test_find_actor_id_uses_latest_turn_not_first_in_history() -> None:
+    """In a multi-actor group chat, an earlier turn from a different actor
+    must not shadow the current speaker. Repeated-move detection depends on
+    every past turn resending its own actor marker, so history routinely
+    contains several actors' markers - find_actor_id must pick the latest
+    one, not the first."""
+    messages = [
+        {"role": "system", "content": "You are participating in a workplace meeting."},
+        {"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready to start SIT?"},
+        {"role": "assistant", "content": "We still have two environment issues open."},
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=dana] The integration owner hasn't signed off.",
+        },
+        {"role": "assistant", "content": "I'll chase that this afternoon."},
+        {"role": "user", "content": "[ARENA_ACTOR=marcus] What's the evidence those block us?"},
+    ]
+    assert find_actor_id(messages) == "marcus"
+
+
 def test_unknown_actor_degrades_safely() -> None:
     messages = [{"role": "user", "content": "[ARENA_ACTOR=unknown] Are we ready?"}]
     assert find_actor_id(messages) is None
@@ -73,6 +93,24 @@ def test_strip_actor_markers_from_messages() -> None:
 def test_move_guidance_loads() -> None:
     guidance = load_move_guidance(Path("config/moves/moves.yaml"))
     assert "prevents progress" in guidance[Move.CLARIFY_BLOCKER]
+
+
+def test_find_stance_and_condition_use_latest_turn_not_first_in_history() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=collaborative] "
+            "[ARENA_CONDITION=normal] Are we ready to start SIT?",
+        },
+        {"role": "assistant", "content": "We still have two environment issues open."},
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_STANCE=sceptical] "
+            "[ARENA_CONDITION=frazzled] So can we call this ready to go?",
+        },
+    ]
+    assert find_stance(messages) == "SCEPTICAL"
+    assert find_condition(messages) == "FRAZZLED"
 
 
 def test_stance_and_condition_marker_parsing() -> None:

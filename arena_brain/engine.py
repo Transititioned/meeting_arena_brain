@@ -123,7 +123,13 @@ def strip_actor_markers_from_messages(
 
 
 def find_actor_id(messages: list[dict[str, Any]]) -> str | None:
-    for message in messages:
+    """Identify the actor whose turn this is: the LATEST message carrying a
+    recognised actor marker, not the first one in history. With the
+    repeated-move feature resending every past turn's marker, earlier turns
+    routinely belong to other actors, so a forward scan would misidentify
+    the current speaker in any multi-actor conversation.
+    """
+    for message in reversed(messages):
         content = message.get("content")
         if isinstance(content, str):
             actor_id = parse_actor_marker(content)
@@ -133,7 +139,7 @@ def find_actor_id(messages: list[dict[str, Any]]) -> str | None:
 
 
 def find_stance(messages: list[dict[str, Any]]) -> str | None:
-    for message in messages:
+    for message in reversed(messages):
         content = message.get("content")
         if isinstance(content, str):
             stance = parse_stance_marker(content)
@@ -143,7 +149,7 @@ def find_stance(messages: list[dict[str, Any]]) -> str | None:
 
 
 def find_condition(messages: list[dict[str, Any]]) -> str | None:
-    for message in messages:
+    for message in reversed(messages):
         content = message.get("content")
         if isinstance(content, str):
             condition = parse_condition_marker(content)

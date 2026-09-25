@@ -13,13 +13,28 @@ and forwards the request to OpenAI `gpt-4o-mini`.
 
 ## Windows setup
 
-Run these commands from the repository root:
+Run these commands from the repository root.
+
+Command Prompt (cmd.exe):
 
 ```cmd
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+If PowerShell's prompt doesn't show a `(.venv)` prefix after activating, that's
+usually just a custom prompt (oh-my-posh, Starship, a `$PROFILE` script)
+overriding it — activation still worked if `Get-Command python` resolves to
+`.venv\Scripts\python.exe`.
 
 Supply the OpenAI key locally without committing it. The app does **not**
 load `.env` automatically — set the real key as an environment variable in
