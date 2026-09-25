@@ -172,13 +172,13 @@ def build_coach_prompt(context: CoachContext) -> list[dict[str, str]]:
             f"{name}: {guidance}" for name, guidance in power_protection.items()
         )
         system_parts.append(
-            f"Power difficulty in this scenario is {context.power_name}. "
-            f"{power_sensitivity} Power difficulty changes your sensitivity "
-            "to consequences, never your licence to speculate: it does not "
-            "prove motive on its own, and any political read must still be "
-            "supported by what the transcript actually shows. Where "
-            "relevant, draw on this Power Protection repertoire, using at "
-            "most one or two items, not all of them: " + principle_lines
+            f"Power difficulty in this scenario is {context.power_name}. This "
+            "changes your sensitivity to consequences only, never your "
+            "licence to speculate: it does not prove motive on its own, and "
+            "any political read must still be supported by what the "
+            f"transcript actually shows. {power_sensitivity} Where relevant, "
+            "draw on this Power Protection repertoire, using at most one or "
+            "two items, not all of them: " + principle_lines
         )
 
     context_lines: list[str] = []

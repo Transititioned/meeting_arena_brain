@@ -309,6 +309,50 @@ def test_build_coach_prompt_power_protection_carries_no_speculation_guardrail() 
     assert "supported by what the transcript actually shows" in system_content
 
 
+def test_build_coach_prompt_states_guardrail_before_sensitivity_note() -> None:
+    """The 'sensitivity, not evidence' guardrail must be read before the
+    level-specific sensitivity note it's qualifying - not as an
+    afterthought tacked on at the end."""
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name="RED",
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    guardrail_index = system_content.index("does not prove motive on its own")
+    sensitivity_index = system_content.index("decision rights, accountability, public positioning")
+    repertoire_index = system_content.index("PROTECT_ROLE_NOT_EGO")
+    assert guardrail_index < sensitivity_index < repertoire_index
+
+
+def test_power_protection_socialise_tactic_restored() -> None:
+    assert "socialising" in POWER_PROTECTION_GUIDANCE["USE_POLITICAL_COVER_SELECTIVELY"]
+    assert (
+        "high-stakes meeting"
+        in POWER_PROTECTION_GUIDANCE["USE_POLITICAL_COVER_SELECTIVELY"]
+    )
+
+
+def test_overlapping_principle_pairs_are_textually_distinct() -> None:
+    """CLARIFY_PRIORITY/SURFACE_CONFLICTING_DIRECTIONS and
+    PROTECT_ACCOUNTABILITY/FLAG_ACCOUNTABILITY_WITHOUT_CONTROL used to be
+    near-duplicates across the two repertoires. They may still share theme
+    and some vocabulary, but must not be near-identical sentences."""
+    clarify_priority = MANAGING_UP_GUIDANCE["CLARIFY_PRIORITY"]
+    surface_conflicting = POWER_PROTECTION_GUIDANCE["SURFACE_CONFLICTING_DIRECTIONS"]
+    assert clarify_priority != surface_conflicting
+    assert "the boss's own" in clarify_priority
+    assert "different people" in surface_conflicting
+
+    protect_accountability = MANAGING_UP_GUIDANCE["PROTECT_ACCOUNTABILITY"]
+    flag_accountability = POWER_PROTECTION_GUIDANCE["FLAG_ACCOUNTABILITY_WITHOUT_CONTROL"]
+    assert protect_accountability != flag_accountability
+    assert "in that conversation" in protect_accountability
+    assert "across several turns or people" in flag_accountability
+
+
 def test_build_coach_prompt_includes_both_managing_up_and_power_protection() -> None:
     """The two lenses are orthogonal (BOSS relationship + RED room) and
     must be able to co-occur in the same Coach prompt."""

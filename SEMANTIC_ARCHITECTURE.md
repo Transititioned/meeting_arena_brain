@@ -251,6 +251,14 @@ Do **not**:
   motive. `build_coach_prompt()` must keep stating explicitly that a
   political read needs transcript support — power difficulty raises
   sensitivity, it never grants licence to speculate (section 8).
+- Let `CLARIFY_PRIORITY`/`SURFACE_CONFLICTING_DIRECTIONS` or
+  `PROTECT_ACCOUNTABILITY`/`FLAG_ACCOUNTABILITY_WITHOUT_CONTROL` drift back
+  into near-duplicate wording across the two repertoires. They share a
+  theme by design (talking to your literal boss is itself a power-
+  asymmetric case), but each pair must stay textually distinct: Managing
+  Up's half is the in-conversation tactic with the boss specifically;
+  Power Protection's half is the structural pattern to notice regardless
+  of who's in the room (section 8).
 - Make `POST /v1/coach` fire automatically after an actor response, add a
   classifier/reasoning call before it, chain a second call after it, or
   otherwise break the one-explicit-request-per-one-LLM-call guarantee for
@@ -359,10 +367,10 @@ canned phrasing:
 | Principle | Logic |
 |---|---|
 | `ALIGN_BEFORE_CHALLENGE` | Briefly recognise the boss's direction/authority before presenting a different view — alignment signalling, not automatic agreement |
-| `CLARIFY_PRIORITY` | When instructions or priorities conflict, make the decision point explicit rather than silently absorbing incompatible directions |
+| `CLARIFY_PRIORITY` | When *the boss's own* instructions conflict, ask directly what's now the priority — a conversational move with this specific person, not a general observation |
 | `STATE_CONSTRAINT` | State a genuine constraint/risk/trade-off factually and concisely — decision-quality information, not self-justification |
 | `OFFER_OPTIONS` | Give workable choices or a recommendation rather than just a problem — preserve the boss's decision authority |
-| `PROTECT_ACCOUNTABILITY` | Make ownership and changed responsibilities explicit when necessary, without becoming territorial |
+| `PROTECT_ACCOUNTABILITY` | When *the boss's own* words change who owns what, say so factually and immediately, in that conversation |
 | `CONFIRM_AND_RECORD` | Close material discussions with a clear decision, owner, and next action; selective written follow-up when direction/accountability materially changes |
 
 `get_managing_up_guidance(relationship_name)` returns the full
@@ -379,11 +387,11 @@ defensive, territorial or paranoid:
 |---|---|
 | `PROTECT_ROLE_NOT_EGO` | Focus on work structure (who owns the decision, who owns delivery) rather than territorial language |
 | `TEST_PROCESS_BEFORE_MOTIVE` | Don't assume a power play from discomfort alone — first test whether unclear process, roles, or priorities explain it; escalate the political read only when the behaviour supports it |
-| `SURFACE_CONFLICTING_DIRECTIONS` | Make incompatible instructions and the resulting trade-off visible rather than quietly promising both |
+| `SURFACE_CONFLICTING_DIRECTIONS` | Conflicting instructions from *different people* create exposure if left unresolved — get the conflict on record and the resolution named, not just quietly juggled |
 | `DISTINGUISH_HELP_FROM_TRANSFER` | Support isn't automatically a threat, but a real change to ownership, reporting lines, decision rights, or resources should be made explicit |
 | `RECLAIM_AUTHORITY_CALMLY` | When challenged or publicly repositioned, stay on the substance and restore the working frame — don't win a dominance contest |
-| `FLAG_ACCOUNTABILITY_WITHOUT_CONTROL` | Watch for remaining responsible for an outcome while someone else controls the decisions/resources behind it |
-| `USE_POLITICAL_COVER_SELECTIVELY` | Aligning before challenging, offering options, confirming decisions are useful tactics — not a reason for defensive documentation of everything |
+| `FLAG_ACCOUNTABILITY_WITHOUT_CONTROL` | Watch for accountability that outlives control, *building gradually across turns or people* — the fix is structural (real authority or a documented redefinition), not a one-off comment |
+| `USE_POLITICAL_COVER_SELECTIVELY` | Aligning before challenging, offering options, confirming decisions, and socialising a difficult issue before a high-stakes meeting are useful tactics — not a reason for defensive documentation of everything |
 | `PROTECT_CREDIT_NATURALLY` | Restate the current truth and anchor to the work already done if a contribution is reframed — narrative accuracy, not score-settling |
 
 `get_power_protection_guidance(power_name)` returns this same eight-item
