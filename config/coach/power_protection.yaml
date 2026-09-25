@@ -15,8 +15,8 @@ USE_POLITICAL_COVER_SELECTIVELY:
 PROTECT_CREDIT_NATURALLY:
   If a contribution gets reframed or appropriated, restate the current truth and anchor to the work or decision already made. Share credit where appropriate; avoid accusing someone of stealing credit unless genuinely necessary.
 GREEN:
-  Assume normal work-focused hierarchy unless the conversation shows otherwise.
+  High threshold for reacting. Default to normal cooperation and assume a work-focused hierarchy unless the conversation clearly shows otherwise.
 AMBER:
-  Pay more attention to status alignment, task shifting, visibility seeking, scope ambiguity, and who is taking political heat.
+  Still let minor friction go, but pay attention to ownership, visibility, task shifting, scope ambiguity, and who is taking political heat.
 RED:
-  Pay particular attention to decision rights, accountability, public positioning, scope/resource encroachment, and reputation risk.
+  Be warm and appropriately formal rather than combative, but much quicker to clarify authority, accountability, scope, decision rights, and public positioning when they are genuinely at stake.

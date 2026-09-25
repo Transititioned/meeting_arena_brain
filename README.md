@@ -225,6 +225,14 @@ Two Coach-only lenses layer on top of the generic rubric, and can combine:
 
 With neither active, Coach still gives generic communication feedback.
 
+In all cases the Coach is deliberately not reactive: minor friction
+(slights, interruptions, jockeying, imperfect wording) usually deserves no
+response and the user is never faulted for letting it pass. It steps in
+when scope, ownership, decision rights, accountability, resources, credit
+or reputation are materially at stake, favours warmth with appropriate
+formality, and values a clean finish (decision, owner, next step) over a
+perfect middle. `GREEN`/`AMBER`/`RED` move that reaction threshold.
+
 Request:
 
 ```json

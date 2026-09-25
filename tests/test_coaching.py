@@ -267,7 +267,7 @@ def test_build_coach_prompt_includes_power_protection_for_red() -> None:
     )
     system_content = build_coach_prompt(context)[0]["content"]
     assert "PROTECT_ROLE_NOT_EGO" in system_content
-    assert "decision rights, accountability, public positioning" in system_content
+    assert "much quicker to clarify authority" in system_content
 
 
 def test_build_coach_prompt_includes_power_protection_for_green() -> None:
@@ -280,7 +280,7 @@ def test_build_coach_prompt_includes_power_protection_for_green() -> None:
     )
     system_content = build_coach_prompt(context)[0]["content"]
     assert "PROTECT_ROLE_NOT_EGO" in system_content
-    assert "Assume normal work-focused hierarchy" in system_content
+    assert "High threshold for reacting" in system_content
 
 
 def test_build_coach_prompt_excludes_power_protection_when_power_missing() -> None:
@@ -322,7 +322,7 @@ def test_build_coach_prompt_states_guardrail_before_sensitivity_note() -> None:
     )
     system_content = build_coach_prompt(context)[0]["content"]
     guardrail_index = system_content.index("does not prove motive on its own")
-    sensitivity_index = system_content.index("decision rights, accountability, public positioning")
+    sensitivity_index = system_content.index("much quicker to clarify authority")
     repertoire_index = system_content.index("PROTECT_ROLE_NOT_EGO")
     assert guardrail_index < sensitivity_index < repertoire_index
 
@@ -383,3 +383,28 @@ def test_build_coach_context_power_name_none_when_absent() -> None:
     messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
     context = build_coach_context(messages)
     assert context.power_name is None
+
+
+def test_proportionality_applies_even_with_no_lens_active() -> None:
+    """'Let small things go' is a generic Coach rule, not a Power Protection
+    feature - it must be present even with no relationship or power set."""
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name=None,
+        recent_context=[],
+        latest_user_utterance="Sure, carrying on.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "Minor social friction" in system_content
+    assert "never fault the user for not reacting to it" in system_content
+    assert "warmth with appropriate formality" in system_content
+    assert "clear decision, owner and next step" in system_content
+
+
+def test_each_power_level_carries_its_reaction_threshold() -> None:
+    assert "High threshold for reacting" in get_power_sensitivity("GREEN")
+    assert "let minor friction go" in get_power_sensitivity("AMBER")
+    red = get_power_sensitivity("RED")
+    assert "rather than combative" in red
+    assert "much quicker to clarify" in red

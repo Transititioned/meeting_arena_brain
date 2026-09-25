@@ -251,6 +251,12 @@ Do **not**:
   motive. `build_coach_prompt()` must keep stating explicitly that a
   political read needs transcript support — power difficulty raises
   sensitivity, it never grants licence to speculate (section 8).
+- Make the Coach reactive. Letting minor friction pass is often the right
+  call, and the Coach must never treat it as a missed opportunity. Don't
+  remove or weaken the proportionality hierarchy in `GENERIC_COACH_RULES`,
+  and don't let any R/A/G level lower the bar for reacting to *minor*
+  friction — `RED` makes the Coach quicker on material authority/
+  accountability/scope issues only (section 8).
 - Let `CLARIFY_PRIORITY`/`SURFACE_CONFLICTING_DIRECTIONS` or
   `PROTECT_ACCOUNTABILITY`/`FLAG_ACCOUNTABILITY_WITHOUT_CONTROL` drift back
   into near-duplicate wording across the two repertoires. They share a
@@ -403,11 +409,24 @@ vary by level.** What does vary is the sensitivity note
 `config/power/power.yaml`, kept in a separate file because it's Coach
 guidance, not the room's semantic definition):
 
-| Level | Sensitivity |
+| Level | Reaction threshold / sensitivity |
 |---|---|
-| `GREEN` | Assume normal work-focused hierarchy unless the conversation shows otherwise |
-| `AMBER` | Pay more attention to status alignment, task shifting, visibility seeking, scope ambiguity, and who is taking political heat |
-| `RED` | Pay particular attention to decision rights, accountability, public positioning, scope/resource encroachment, and reputation risk |
+| `GREEN` | High threshold for reacting. Default to normal cooperation; assume a work-focused hierarchy unless the conversation clearly shows otherwise |
+| `AMBER` | Still let minor friction go, but pay attention to ownership, visibility, task shifting, scope ambiguity, and who is taking political heat |
+| `RED` | Warm and appropriately formal rather than combative, but much quicker to clarify authority, accountability, scope, decision rights, and public positioning when genuinely at stake |
+
+**Proportionality applies to every Coach request, lens or no lens.** The
+generic Coach rubric (`GENERIC_COACH_RULES`) carries a hierarchy of
+attention: minor social friction (a slight, an interruption, jockeying,
+imperfect wording) usually deserves no response, and the Coach must never
+fault the user for letting it pass; material ambiguity or risk to scope,
+ownership, decision rights, accountability, resources, credit or reputation
+warrants calm clarification; a material political threat warrants calmly
+protecting role and accountability. Throughout, warmth plus appropriate
+formality — neither stiff nor matey. And as a topic closes, a clear
+decision, owner and next step outweighs a slightly messy middle. The R/A/G
+levels above move the *threshold* along that hierarchy; they don't replace
+it.
 
 **Power difficulty changes the Coach's sensitivity to consequences, never
 its licence to speculate.** This is a hard guardrail, not a suggestion:
