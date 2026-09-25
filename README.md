@@ -207,23 +207,34 @@ activates the Managing Up coaching repertoire in that Coach prompt. See
 
 An explicit, separate endpoint — never called automatically after an actor
 response. Given the same SillyTavern-style `messages` history, it derives
-actor/relationship from the existing markers, builds a small deterministic
-context window (up to the most recent 8 user/assistant messages, markers
-stripped, system messages excluded), and makes exactly one LLM call to give
-one concise (~100 word) coaching observation. When the current actor's
-relationship is `BOSS`, the Managing Up repertoire is included; otherwise
-the Coach still gives generic communication feedback.
+actor/relationship/power difficulty from the existing markers, builds a
+small deterministic context window (up to the most recent 8 user/assistant
+messages, markers stripped, system messages excluded), and makes exactly
+one LLM call to give one concise (~100 word) coaching observation.
+
+Two Coach-only lenses layer on top of the generic rubric, and can combine:
+
+- When the current actor's relationship is `BOSS`, the **Managing Up**
+  repertoire is included.
+- When power difficulty is set (`GREEN`/`AMBER`/`RED`), the **Power
+  Protection** repertoire is included, paired with a level-specific
+  sensitivity note. The repertoire itself never changes by level — only
+  how much attention the Coach is told to pay to consequences. A higher
+  level never proves someone is acting against the user; the transcript
+  still has to support that read.
+
+With neither active, Coach still gives generic communication feedback.
 
 Request:
 
 ```json
-{ "messages": [ { "role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Yep, will do." } ] }
+{ "messages": [ { "role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] [ARENA_POWER=red] Yep, will do." } ] }
 ```
 
 Response:
 
 ```json
-{ "feedback": "...", "relationship": "BOSS", "actor": "priya" }
+{ "feedback": "...", "relationship": "BOSS", "power": "RED", "actor": "priya" }
 ```
 
 Manual test from PowerShell (server must already be running via
@@ -233,7 +244,7 @@ a real response — this will make one live OpenAI call):
 ```powershell
 $body = @{
     messages = @(
-        @{ role = "user"; content = "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Yep, will do." }
+        @{ role = "user"; content = "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] [ARENA_POWER=red] Yep, will do." }
     )
 } | ConvertTo-Json -Depth 10
 

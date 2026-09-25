@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from arena_brain.engine import (
+    VALID_POWER_LEVELS,
     find_actor_id,
+    find_power,
     find_relationship,
     latest_user_text,
     load_named_guidance,
@@ -16,6 +18,23 @@ ROOT = Path(__file__).resolve().parents[1]
 MANAGING_UP_GUIDANCE: dict[str, str] = load_named_guidance(
     ROOT / "config" / "coach" / "managing_up.yaml"
 )
+
+_POWER_PROTECTION_RAW: dict[str, str] = load_named_guidance(
+    ROOT / "config" / "coach" / "power_protection.yaml"
+)
+# power_protection.yaml holds two logically distinct things in one flat
+# file: the level-independent repertoire (8 principles) and the
+# level-specific sensitivity note (GREEN/AMBER/RED, same closed vocabulary
+# as config/power/power.yaml). Split them here rather than in the config
+# file, since load_named_guidance() only knows flat KEY: text pairs.
+POWER_SENSITIVITY: dict[str, str] = {
+    level: _POWER_PROTECTION_RAW[level] for level in VALID_POWER_LEVELS
+}
+POWER_PROTECTION_GUIDANCE: dict[str, str] = {
+    name: guidance
+    for name, guidance in _POWER_PROTECTION_RAW.items()
+    if name not in VALID_POWER_LEVELS
+}
 
 RECENT_CONTEXT_LIMIT = 8
 
@@ -59,10 +78,38 @@ def get_managing_up_guidance(relationship_name: str | None) -> dict[str, str] | 
     return MANAGING_UP_GUIDANCE
 
 
+def get_power_protection_guidance(power_name: str | None) -> dict[str, str] | None:
+    """Power Protection is a Coach-side evaluation lens keyed on power
+    difficulty (room-wide), not relationship (actor-to-user) - it applies
+    regardless of which actor the user is talking to. GREEN, AMBER, and RED
+    all activate the SAME repertoire (8 principles); only the sensitivity
+    note (get_power_sensitivity) varies by level. Missing or unrecognised
+    power resolves to None, same "no override" convention as everywhere
+    else in this codebase. Never consumed by actor generation - see
+    SEMANTIC_ARCHITECTURE.md.
+    """
+    if power_name not in VALID_POWER_LEVELS:
+        return None
+    return POWER_PROTECTION_GUIDANCE
+
+
+def get_power_sensitivity(power_name: str | None) -> str | None:
+    """What the Coach should pay more attention to at this power-difficulty
+    level. Power difficulty changes the Coach's SENSITIVITY to
+    consequences, never its licence to speculate - it must never be used to
+    assert motive the transcript doesn't actually support. See
+    build_coach_prompt(), which pairs this with that guardrail explicitly.
+    """
+    if power_name not in VALID_POWER_LEVELS:
+        return None
+    return POWER_SENSITIVITY.get(power_name)
+
+
 @dataclass(frozen=True)
 class CoachContext:
     actor_id: str | None
     relationship_name: str | None
+    power_name: str | None
     recent_context: list[dict[str, Any]]
     latest_user_utterance: str
 
@@ -82,6 +129,7 @@ def build_coach_context(
     """
     actor_id = find_actor_id(messages)
     relationship_name = find_relationship(messages)
+    power_name = find_power(messages)
     latest_user_utterance = latest_user_text(messages)
 
     dialogue = [
@@ -95,6 +143,7 @@ def build_coach_context(
     return CoachContext(
         actor_id=actor_id,
         relationship_name=relationship_name,
+        power_name=power_name,
         recent_context=recent_context,
         latest_user_utterance=latest_user_utterance,
     )
@@ -104,6 +153,8 @@ def build_coach_prompt(context: CoachContext) -> list[dict[str, str]]:
     """Build the Coach's own one-off prompt. Deliberately separate from
     build_behavior_instruction(), which remains actor-rendering-only."""
     managing_up = get_managing_up_guidance(context.relationship_name)
+    power_protection = get_power_protection_guidance(context.power_name)
+    power_sensitivity = get_power_sensitivity(context.power_name)
 
     system_parts = [GENERIC_COACH_RULES]
     if managing_up:
@@ -116,12 +167,27 @@ def build_coach_prompt(context: CoachContext) -> list[dict[str, str]]:
             "principles where relevant, using at most one or two, not all "
             "of them: " + principle_lines
         )
+    if power_protection:
+        principle_lines = " ".join(
+            f"{name}: {guidance}" for name, guidance in power_protection.items()
+        )
+        system_parts.append(
+            f"Power difficulty in this scenario is {context.power_name}. "
+            f"{power_sensitivity} Power difficulty changes your sensitivity "
+            "to consequences, never your licence to speculate: it does not "
+            "prove motive on its own, and any political read must still be "
+            "supported by what the transcript actually shows. Where "
+            "relevant, draw on this Power Protection repertoire, using at "
+            "most one or two items, not all of them: " + principle_lines
+        )
 
     context_lines: list[str] = []
     if context.actor_id:
         context_lines.append(f"Current actor: {context.actor_id}")
     if context.relationship_name:
         context_lines.append(f"Relationship: {context.relationship_name}")
+    if context.power_name:
+        context_lines.append(f"Power difficulty: {context.power_name}")
 
     context_lines.append("")
     context_lines.append("Recent conversation:")

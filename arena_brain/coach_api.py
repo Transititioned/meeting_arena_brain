@@ -60,8 +60,9 @@ async def coach(payload: dict[str, Any]) -> JSONResponse:
         body = response.json()
         feedback = body["choices"][0]["message"]["content"]
         logger.info(
-            "coach actor=%s relationship=%s model=%s http_result=%s elapsed_ms=%s",
+            "coach actor=%s power=%s relationship=%s model=%s http_result=%s elapsed_ms=%s",
             context.actor_id or "unknown",
+            context.power_name or "none",
             context.relationship_name or "none",
             coach_model,
             status_code,
@@ -72,14 +73,16 @@ async def coach(payload: dict[str, Any]) -> JSONResponse:
             content={
                 "feedback": feedback,
                 "relationship": context.relationship_name or "none",
+                "power": context.power_name or "none",
                 "actor": context.actor_id or "unknown",
             },
         )
     except httpx.HTTPError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "coach actor=%s relationship=%s model=%s http_result=%s elapsed_ms=%s",
+            "coach actor=%s power=%s relationship=%s model=%s http_result=%s elapsed_ms=%s",
             context.actor_id or "unknown",
+            context.power_name or "none",
             context.relationship_name or "none",
             coach_model,
             status_code or "transport_error",

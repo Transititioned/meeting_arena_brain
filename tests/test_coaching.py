@@ -2,12 +2,27 @@ from pathlib import Path
 
 from arena_brain.coaching import (
     MANAGING_UP_GUIDANCE,
+    POWER_PROTECTION_GUIDANCE,
+    POWER_SENSITIVITY,
     CoachContext,
     build_coach_context,
     build_coach_prompt,
     get_managing_up_guidance,
+    get_power_protection_guidance,
+    get_power_sensitivity,
 )
 from arena_brain.engine import load_named_guidance
+
+POWER_PROTECTION_PRINCIPLES = {
+    "PROTECT_ROLE_NOT_EGO",
+    "TEST_PROCESS_BEFORE_MOTIVE",
+    "SURFACE_CONFLICTING_DIRECTIONS",
+    "DISTINGUISH_HELP_FROM_TRANSFER",
+    "RECLAIM_AUTHORITY_CALMLY",
+    "FLAG_ACCOUNTABILITY_WITHOUT_CONTROL",
+    "USE_POLITICAL_COVER_SELECTIVELY",
+    "PROTECT_CREDIT_NATURALLY",
+}
 
 MANAGING_UP_PRINCIPLES = {
     "ALIGN_BEFORE_CHALLENGE",
@@ -130,6 +145,7 @@ def test_build_coach_prompt_includes_managing_up_for_boss() -> None:
     context = CoachContext(
         actor_id="priya",
         relationship_name="BOSS",
+        power_name=None,
         recent_context=[],
         latest_user_utterance="Got it.",
     )
@@ -142,6 +158,7 @@ def test_build_coach_prompt_excludes_managing_up_for_peer() -> None:
     context = CoachContext(
         actor_id="marcus",
         relationship_name="PEER",
+        power_name=None,
         recent_context=[],
         latest_user_utterance="Got it.",
     )
@@ -152,6 +169,7 @@ def test_build_coach_prompt_excludes_managing_up_for_direct_report() -> None:
     context = CoachContext(
         actor_id="dana",
         relationship_name="DIRECT_REPORT",
+        power_name=None,
         recent_context=[],
         latest_user_utterance="Got it.",
     )
@@ -162,6 +180,7 @@ def test_build_coach_prompt_excludes_managing_up_when_relationship_missing() -> 
     context = CoachContext(
         actor_id="priya",
         relationship_name=None,
+        power_name=None,
         recent_context=[],
         latest_user_utterance="Got it.",
     )
@@ -172,8 +191,151 @@ def test_build_coach_prompt_includes_verbatim_utterance_delimited() -> None:
     context = CoachContext(
         actor_id="priya",
         relationship_name="BOSS",
+        power_name=None,
         recent_context=[],
         latest_user_utterance="Yep, will do.",
     )
     user_content = build_coach_prompt(context)[1]["content"]
     assert "<<<\nYep, will do.\n>>>" in user_content
+
+
+def test_all_eight_power_protection_principles_load() -> None:
+    assert set(POWER_PROTECTION_GUIDANCE) == POWER_PROTECTION_PRINCIPLES
+    for principle in POWER_PROTECTION_PRINCIPLES:
+        assert POWER_PROTECTION_GUIDANCE[principle]
+
+
+def test_power_sensitivity_has_all_three_levels() -> None:
+    assert set(POWER_SENSITIVITY) == {"GREEN", "AMBER", "RED"}
+    for level in ("GREEN", "AMBER", "RED"):
+        assert POWER_SENSITIVITY[level]
+
+
+def test_green_activates_power_protection_guidance() -> None:
+    assert get_power_protection_guidance("GREEN") == POWER_PROTECTION_GUIDANCE
+
+
+def test_amber_activates_power_protection_guidance() -> None:
+    assert get_power_protection_guidance("AMBER") == POWER_PROTECTION_GUIDANCE
+
+
+def test_red_activates_power_protection_guidance() -> None:
+    assert get_power_protection_guidance("RED") == POWER_PROTECTION_GUIDANCE
+
+
+def test_missing_power_does_not_activate_power_protection_guidance() -> None:
+    assert get_power_protection_guidance(None) is None
+
+
+def test_unknown_power_does_not_activate_power_protection_guidance() -> None:
+    assert get_power_protection_guidance("BLUE") is None
+
+
+def test_power_protection_repertoire_is_identical_across_levels() -> None:
+    """Power difficulty changes sensitivity, not the underlying evidence
+    the Coach draws on - the repertoire itself must not vary by level."""
+    assert (
+        get_power_protection_guidance("GREEN")
+        == get_power_protection_guidance("AMBER")
+        == get_power_protection_guidance("RED")
+    )
+
+
+def test_power_sensitivity_differs_by_level() -> None:
+    green = get_power_sensitivity("GREEN")
+    amber = get_power_sensitivity("AMBER")
+    red = get_power_sensitivity("RED")
+    assert green != amber != red
+    assert len({green, amber, red}) == 3
+
+
+def test_missing_power_has_no_sensitivity_note() -> None:
+    assert get_power_sensitivity(None) is None
+
+
+def test_unknown_power_has_no_sensitivity_note() -> None:
+    assert get_power_sensitivity("BLUE") is None
+
+
+def test_build_coach_prompt_includes_power_protection_for_red() -> None:
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name="RED",
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "PROTECT_ROLE_NOT_EGO" in system_content
+    assert "decision rights, accountability, public positioning" in system_content
+
+
+def test_build_coach_prompt_includes_power_protection_for_green() -> None:
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name="GREEN",
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "PROTECT_ROLE_NOT_EGO" in system_content
+    assert "Assume normal work-focused hierarchy" in system_content
+
+
+def test_build_coach_prompt_excludes_power_protection_when_power_missing() -> None:
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name=None,
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "PROTECT_ROLE_NOT_EGO" not in system_content
+    assert "Power difficulty" not in system_content
+
+
+def test_build_coach_prompt_power_protection_carries_no_speculation_guardrail() -> None:
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name=None,
+        power_name="RED",
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "does not prove motive on its own" in system_content
+    assert "supported by what the transcript actually shows" in system_content
+
+
+def test_build_coach_prompt_includes_both_managing_up_and_power_protection() -> None:
+    """The two lenses are orthogonal (BOSS relationship + RED room) and
+    must be able to co-occur in the same Coach prompt."""
+    context = CoachContext(
+        actor_id="priya",
+        relationship_name="BOSS",
+        power_name="RED",
+        recent_context=[],
+        latest_user_utterance="Got it.",
+    )
+    system_content = build_coach_prompt(context)[0]["content"]
+    assert "ALIGN_BEFORE_CHALLENGE" in system_content
+    assert "PROTECT_ROLE_NOT_EGO" in system_content
+
+
+def test_build_coach_context_derives_power_name() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_POWER=amber] Are we ready?",
+        }
+    ]
+    context = build_coach_context(messages)
+    assert context.power_name == "AMBER"
+
+
+def test_build_coach_context_power_name_none_when_absent() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
+    context = build_coach_context(messages)
+    assert context.power_name is None

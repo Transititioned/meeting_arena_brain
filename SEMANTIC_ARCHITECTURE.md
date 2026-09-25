@@ -43,21 +43,22 @@ Room power difficulty = AMBER
   Dana   relationship = PEER
 ```
 
-**Iteration-one note:** power difficulty is fully inert — defined and
-plumbed (parsed, tracked, logged) but does **not** yet feed any remote LLM
-or influence any other layer; see section 4. Relationship is likewise
-permanently inert in *actor generation* (never reaches the actor-rendering
-LLM call), but it now has exactly one downstream consumer: `BOSS`
-deterministically activates the Managing Up repertoire for the explicit
-Coach path (`POST /v1/coach`, section 8), which does make its own, separate
-LLM call. That Coach path is now implemented as an MVP.
+**Iteration-one note:** both power difficulty and relationship are
+permanently inert in *actor generation* — parsed, tracked, logged, but
+never reach the actor-rendering LLM call or influence move selection,
+stance, condition, or repeated-move logic; see section 4. Each has exactly
+one downstream consumer, and it's the same one: the explicit Coach path
+(`POST /v1/coach`, section 8). `BOSS` activates the Managing Up repertoire;
+`GREEN`/`AMBER`/`RED` activate the Power Protection repertoire. Both are
+Coach-only lenses that make their own, separate LLM call — neither is a
+new actor-generation layer.
 
 ## 2. Ownership boundaries
 
 | Concern | Owner | Where |
 |---|---|---|
 | Stable persona (who someone is, voice, cadence, normal challenge style, dialogue examples) | SillyTavern | The character card, not this repo |
-| Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata (iteration one: not yet consumed downstream) | `config/power/power.yaml` |
+| Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata; permanently inert in actor generation. Its one downstream consumer is the Power Protection resolver (section 8), called by the Coach path (`POST /v1/coach`) | `config/power/power.yaml` |
 | Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata; permanently inert in actor generation. Its one downstream consumer is the Managing Up resolver (section 8), called by the Coach path (`POST /v1/coach`) | `config/relationships/relationships.yaml` |
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
@@ -84,15 +85,20 @@ condition:
 
 | Value | Meaning |
 |---|---|
-| `GREEN` | Normal organisational hierarchy. Bosses are still bosses and people protect their own responsibilities, but disagreement is mainly substantive rather than political |
-| `AMBER` | Status behaviour is present — playing to the boss, seeking visibility, subtle positioning, offloading awkward work, letting someone else take political heat — but stays plausible, socially normal and deniable rather than overtly hostile |
-| `RED` | A credible political threat is present — scope/authority encroachment, publicly distancing from a failure, undermining someone's standing, joining a pile-on, transferring accountability while keeping influence — while still reading as believable workplace politics, not cartoon villainy |
+| `GREEN` | Normal organisational hierarchy. Bosses are still bosses and people protect their own responsibilities, but disagreement is mainly substantive rather than political. Deterministically activates the Power Protection coaching repertoire in the Coach path (section 8, `POST /v1/coach`) |
+| `AMBER` | Status behaviour is present — playing to the boss, seeking visibility, subtle positioning, offloading awkward work, letting someone else take political heat — but stays plausible, socially normal and deniable rather than overtly hostile. Also activates Power Protection |
+| `RED` | A credible political threat is present — scope/authority encroachment, publicly distancing from a failure, undermining someone's standing, joining a pile-on, transferring accountability while keeping influence — while still reading as believable workplace politics, not cartoon villainy. Also activates Power Protection |
 
-**Iteration-one rule:** `ARENA_POWER` is control metadata only. It is parsed,
-tracked, and logged, but must not affect move selection, stance, condition,
-repeated-move logic, or rendering, and must not inject any guidance into the
-LLM prompt. Later tasks will decide how GREEN/AMBER/RED actually affect
-simulation behaviour — do not pre-empt that here.
+**Iteration-one rule:** `ARENA_POWER` is control metadata only with respect
+to actor generation. It is parsed, tracked, and logged, but must not affect
+move selection, stance, condition, repeated-move logic, or rendering, and
+must never inject any guidance into the *actor's* LLM prompt
+(`build_behavior_instruction()`). Every recognised value (`GREEN`/`AMBER`/
+`RED`) does deterministically activate the Power Protection coaching
+repertoire (section 8) — but that only reaches the separate, explicit
+Coach path (`POST /v1/coach`), never the actor-generation path. Later tasks
+may decide whether power difficulty should ever affect simulation/rendering
+behaviour — do not pre-empt that here.
 
 **Relationship / authority** (`config/relationships/relationships.yaml`) —
 the current actor's formal authority relationship to the user. This is
@@ -213,13 +219,14 @@ Do **not**:
 - Add an LLM call before the renderer.
 - Make stance/condition affect move selection in iteration one.
 - Let power difficulty influence move selection, stance, condition,
-  repeated-move logic, rendering, or Coach behaviour until a later task
-  explicitly authorises it. Iteration one is parsing, tracking, and logging
-  only.
+  repeated-move logic, or rendering. It remains inert throughout actor
+  generation permanently — its only authorised downstream consumer is the
+  Power Protection resolver (section 8), reached exclusively via the Coach
+  path.
 - Let relationship influence move selection, stance, condition, power
   difficulty, repeated-move logic, or rendering. It remains inert
-  throughout actor generation permanently, not just "for now" — its only
-  authorised downstream consumer is the Managing Up resolver (section 8).
+  throughout actor generation permanently — its only authorised downstream
+  consumer is the Managing Up resolver (section 8).
 - Conflate relationship (actor-to-user authority) with power difficulty
   (room-wide political difficulty). They are independent and must stay
   that way in code, config, and prompts.
@@ -227,14 +234,23 @@ Do **not**:
   `BOSS`/`PEER`/`DIRECT_REPORT` without a real scenario proving the current
   vocabulary is too coarse.
 - Import `arena_brain.coaching` from `arena_brain/server.py`'s actor-
-  generation path (`chat_completions`), or otherwise let Managing Up
-  material reach `build_behavior_instruction()` or the actor's outbound
-  prompt. Managing Up belongs exclusively to the Coach path (section 8),
-  routed through `arena_brain/coach_api.py`.
-- Turn the Managing Up repertoire into a six-item checklist a response must
-  satisfy, or write it as a phrasebook of canned lines ("I appreciate your
-  input...", "I hear what you're saying..."). It is a repertoire of logic
-  the Coach draws one or two relevant items from, not a script.
+  generation path (`chat_completions`), or otherwise let Managing Up or
+  Power Protection material reach `build_behavior_instruction()` or the
+  actor's outbound prompt. Both belong exclusively to the Coach path
+  (section 8), routed through `arena_brain/coach_api.py`.
+- Turn the Managing Up or Power Protection repertoire into a checklist a
+  response must satisfy, or write either as a phrasebook of canned lines
+  ("I appreciate your input...", "I hear what you're saying..."). Each is a
+  repertoire of logic the Coach draws one or two relevant items from, not a
+  script.
+- Vary the Power Protection *repertoire* by GREEN/AMBER/RED. Power
+  difficulty changes the Coach's sensitivity note only (section 8) — the
+  underlying evidence-gathering logic stays identical across all three
+  levels.
+- Let a `RED` (or any) power-difficulty reading be treated as proof of
+  motive. `build_coach_prompt()` must keep stating explicitly that a
+  political read needs transcript support — power difficulty raises
+  sensitivity, it never grants licence to speculate (section 8).
 - Make `POST /v1/coach` fire automatically after an actor response, add a
   classifier/reasoning call before it, chain a second call after it, or
   otherwise break the one-explicit-request-per-one-LLM-call guarantee for
@@ -284,53 +300,57 @@ The exact sentence the LLM renders is not part of this architecture — only
 the composition (persona + stance + condition + move) and the constraint
 that the move stays legible through all of it.
 
-## 8. Managing Up and the Coach path (MVP implemented)
+## 8. Coach evaluation lenses: Managing Up and Power Protection
 
-**Relationship and Managing Up are not the same thing — do not conflate
-them:**
+**Relationship/power and their Coach lenses are not the same thing — do not
+conflate them:**
 
-| | Relationship | Managing Up |
-|---|---|---|
-| What it is | Factual actor-to-user authority metadata | A Coach-side behavioural evaluation lens |
-| Where it lives | `arena_brain/engine.py` (`find_relationship`), consumed by the actor-generation path (for routing/logging only — inert otherwise) | `arena_brain/coaching.py`, consumed by the Coach path (`arena_brain/coach_api.py`) |
-| What it evaluates | Nothing — it's a label | How the **user** communicated with an actor who has formal authority over them |
-| Activation | Set explicitly via `[ARENA_RELATIONSHIP=...]` | Deterministically derived: active only when `relationship == BOSS` |
+| | Relationship | Power difficulty | Managing Up | Power Protection |
+|---|---|---|---|---|
+| What it is | Factual actor-to-user authority metadata | Factual room-wide political-difficulty metadata | A Coach-side behavioural evaluation lens | A Coach-side behavioural evaluation lens |
+| Where it lives | `arena_brain/engine.py` (`find_relationship`) | `arena_brain/engine.py` (`find_power`) | `arena_brain/coaching.py`, consumed by the Coach path | `arena_brain/coaching.py`, consumed by the Coach path |
+| What it evaluates | Nothing — it's a label | Nothing — it's a label | How the **user** communicated with an actor who has formal authority over them | How the **user** protects their own scope/authority/accountability/standing |
+| Activation | Set explicitly via `[ARENA_RELATIONSHIP=...]` | Set explicitly via `[ARENA_POWER=...]` | Deterministically derived: active only when `relationship == BOSS` | Deterministically derived: active whenever `power` is `GREEN`/`AMBER`/`RED` |
 
-Managing Up is **not** actor persona, stance, condition, power difficulty,
-an actor conversational move, or a political-event classifier. It does not
-appear as another layer in the actor-generation composition stack in
-section 1 — it lives entirely in the separate, explicit Coach path:
+Neither Coach lens is actor persona, stance, condition, an actor
+conversational move, or a political-event classifier. Neither appears as
+another layer in the actor-generation composition stack in section 1 —
+both live entirely in the separate, explicit Coach path:
 
 ```
-ACTOR PATH (unchanged by this task)
+ACTOR PATH (unchanged)
 
   SillyTavern → POST /v1/chat/completions
     Persona + Power + Relationship metadata + Stance + Condition + Move
     → actor rendering (one LLM call)
 
 
-COACH PATH (this task's MVP — POST /v1/coach, explicit user action only)
+COACH PATH (POST /v1/coach, explicit user action only)
 
   deterministic context assembly (arena_brain/coaching.py::build_coach_context):
     up to 8 most recent user/assistant messages (system messages excluded,
     machine-control markers stripped, order preserved)
     + current actor (find_actor_id)
     + current relationship (find_relationship)
+    + current power difficulty (find_power)
     + the user's latest utterance, verbatim (latest_user_text)
 
   deterministic prompt assembly (arena_brain/coaching.py::build_coach_prompt):
     generic Coach rubric
     + if relationship == BOSS: the Managing Up repertoire
+    + if power in {GREEN, AMBER, RED}: the Power Protection repertoire,
+      paired with that level's sensitivity note
     + the assembled context, with the verbatim utterance delimited
 
   → exactly one Coach LLM call (arena_brain/coach_api.py)
   → one concise coaching observation, JSON: {"feedback": "...", ...}
 ```
 
-Both call paths use the same model (`gpt-4o-mini`) and the same
+Both call paths use their own configured model (section 9) and the same
 `OPENAI_API_KEY`, but they are two entirely separate, explicitly-triggered
 requests — Coach never fires automatically after an actor response, and
-never chains a second call after itself.
+never chains a second call after itself. The two lenses are orthogonal and
+can co-occur in one Coach prompt (e.g. `relationship=BOSS` + `power=RED`).
 
 **The Managing Up repertoire** (`config/coach/managing_up.yaml`) is six
 canonical principles, each capturing a piece of communication *logic*, not
@@ -345,27 +365,67 @@ canned phrasing:
 | `PROTECT_ACCOUNTABILITY` | Make ownership and changed responsibilities explicit when necessary, without becoming territorial |
 | `CONFIRM_AND_RECORD` | Close material discussions with a clear decision, owner, and next action; selective written follow-up when direction/accountability materially changes |
 
-**This is a repertoire, not a checklist.** A good user response typically
-draws on one or two of these, not all six. The Coach identifies the single
-most relevant missed or effective behaviour, never a six-point scorecard.
-Believable human communication matters more than mechanically demonstrating
-a framework — the Coach is explicitly instructed not to invent a flaw just
-because it was invoked, and to say briefly what worked when a short reply
-(e.g. "Yep, will do.") was already adequate.
-
 `get_managing_up_guidance(relationship_name)` returns the full
 `{PRINCIPLE: guidance}` mapping when `relationship_name == "BOSS"`, and
-`None` (never an empty dict — consistent with how every other layer signals
-"no override" in this codebase) for `PEER`, `DIRECT_REPORT`, missing, or
-unknown relationships. It is deterministic, has no LLM call of its own, and
-is still not imported anywhere in `POST /v1/chat/completions` — the actor
-path is structurally unaffected by the Coach path's existence.
+`None` (never an empty dict) for `PEER`, `DIRECT_REPORT`, missing, or
+unknown relationships.
+
+**The Power Protection repertoire** (`config/coach/power_protection.yaml`)
+is eight canonical principles — recognising when the user needs to
+preserve authority, scope, accountability or standing without becoming
+defensive, territorial or paranoid:
+
+| Principle | Logic |
+|---|---|
+| `PROTECT_ROLE_NOT_EGO` | Focus on work structure (who owns the decision, who owns delivery) rather than territorial language |
+| `TEST_PROCESS_BEFORE_MOTIVE` | Don't assume a power play from discomfort alone — first test whether unclear process, roles, or priorities explain it; escalate the political read only when the behaviour supports it |
+| `SURFACE_CONFLICTING_DIRECTIONS` | Make incompatible instructions and the resulting trade-off visible rather than quietly promising both |
+| `DISTINGUISH_HELP_FROM_TRANSFER` | Support isn't automatically a threat, but a real change to ownership, reporting lines, decision rights, or resources should be made explicit |
+| `RECLAIM_AUTHORITY_CALMLY` | When challenged or publicly repositioned, stay on the substance and restore the working frame — don't win a dominance contest |
+| `FLAG_ACCOUNTABILITY_WITHOUT_CONTROL` | Watch for remaining responsible for an outcome while someone else controls the decisions/resources behind it |
+| `USE_POLITICAL_COVER_SELECTIVELY` | Aligning before challenging, offering options, confirming decisions are useful tactics — not a reason for defensive documentation of everything |
+| `PROTECT_CREDIT_NATURALLY` | Restate the current truth and anchor to the work already done if a contribution is reframed — narrative accuracy, not score-settling |
+
+`get_power_protection_guidance(power_name)` returns this same eight-item
+mapping unchanged whenever `power_name` is `GREEN`, `AMBER`, or `RED`, and
+`None` for missing/unrecognised power — **the repertoire itself does not
+vary by level.** What does vary is the sensitivity note
+(`get_power_sensitivity(power_name)`, `config/coach/power_protection.yaml`'s
+`GREEN`/`AMBER`/`RED` keys — the same closed vocabulary as
+`config/power/power.yaml`, kept in a separate file because it's Coach
+guidance, not the room's semantic definition):
+
+| Level | Sensitivity |
+|---|---|
+| `GREEN` | Assume normal work-focused hierarchy unless the conversation shows otherwise |
+| `AMBER` | Pay more attention to status alignment, task shifting, visibility seeking, scope ambiguity, and who is taking political heat |
+| `RED` | Pay particular attention to decision rights, accountability, public positioning, scope/resource encroachment, and reputation risk |
+
+**Power difficulty changes the Coach's sensitivity to consequences, never
+its licence to speculate.** This is a hard guardrail, not a suggestion:
+`RED` never proves that someone is trying to undermine the user — the
+transcript still has to support that interpretation. `build_coach_prompt()`
+states this explicitly in the prompt every time the Power Protection lens
+is active, precisely so a high power-difficulty level can't be read by the
+Coach model as license to manufacture political conflict that isn't there.
+
+**Neither lens is a checklist.** A good user response typically draws on
+one or two items from whichever repertoire is active, not all of them. The
+Coach identifies the single most relevant missed or effective behaviour,
+never a scorecard. Believable human communication matters more than
+mechanically demonstrating a framework — the Coach is explicitly instructed
+not to invent a flaw just because it was invoked, and to say briefly what
+worked when a short reply (e.g. "Yep, will do.") was already adequate.
+
+Both lenses are deterministic, have no LLM call of their own, and are still
+not imported anywhere in `POST /v1/chat/completions` — the actor path is
+structurally unaffected by either lens's existence.
 
 **MVP scope, deliberately not built here:** Coach scoring, numerical
 ratings, skill histories, session storage, automatic/implicit Coach
-invocation, a Coach UI or SillyTavern Quick Reply, power-difficulty or
-stance/condition Coach logic, and full-conversation summarisation. These
-are later tasks.
+invocation, a Coach UI or SillyTavern Quick Reply, stance/condition Coach
+logic, political-event classification, and full-conversation
+summarisation. These are later tasks.
 
 ## 9. Two behaviour lanes and independent model configuration
 
@@ -385,9 +445,11 @@ SillyTavern persona                        recent stripped conversation
 + Power metadata                           + user's latest response, verbatim
 + Relationship metadata                    + actor ID where available
 + Stance                                   + Relationship
-+ Condition                                + generic Coach rubric
-+ deterministic Move                       + Managing Up repertoire (BOSS only)
-+ lightweight (repeated-move) context
++ Condition                                + Power difficulty
++ deterministic Move                       + generic Coach rubric
++ lightweight (repeated-move) context      + Managing Up repertoire (BOSS only)
+                                            + Power Protection repertoire
+                                              (GREEN/AMBER/RED)
         ↓                                          ↓
    ARENA_ACTOR_MODEL                          ARENA_COACH_MODEL
    (default gpt-4o-mini)                      (default gpt-4o-mini)
@@ -404,15 +466,16 @@ Endpoint: POST /v1/chat/completions        Endpoint: POST /v1/coach
 ```
 
 **The actor lane must never consume:** the Managing Up repertoire, the
-generic Coach rubric, coaching feedback instructions, any evaluation of the
-user's communication, or `ARENA_COACH_MODEL`.
+Power Protection repertoire, the generic Coach rubric, coaching feedback
+instructions, any evaluation of the user's communication, or
+`ARENA_COACH_MODEL`.
 
 **The Coach lane must never consume:** actor move selection or its
 guidance, stance/condition rendering guidance, actor persona construction,
 repeated-move logic, or `ARENA_ACTOR_MODEL`.
 
 Shared low-level utilities are fine where genuinely generic (both lanes
-reuse `find_actor_id`, `find_relationship`, `latest_user_text`,
+reuse `find_actor_id`, `find_power`, `find_relationship`, `latest_user_text`,
 `strip_actor_markers_from_messages`, `load_named_guidance` from
 `arena_brain/engine.py` — none of these are behavioural, they're parsing).
 What must **never** be shared is behavioural prompt composition: there is
