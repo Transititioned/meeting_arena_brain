@@ -153,13 +153,18 @@ Valid values and their definitions live in `config/relationships/relationships.y
 — a closed vocabulary, same as power/stance/condition. An unrecognised or
 omitted value is treated as no override.
 
-**This is plumbing only in this iteration.** The marker is parsed, the
-latest applicable one in history wins, it's stripped before forwarding
+**Relationship remains inert in actor generation.** The marker is parsed,
+the latest applicable one in history wins, it's stripped before forwarding
 upstream, and it's logged (`relationship=BOSS` / `PEER` / `DIRECT_REPORT` /
-`none`) — but it does not yet affect move selection, stance, condition,
-power difficulty, repeated-move logic, or the LLM prompt in any way. `BOSS`
-is the future activation point for Managing Up coaching, not implemented
-yet. See `SEMANTIC_ARCHITECTURE.md` for the full rationale.
+`none`) — but it does not affect move selection, stance, condition, power
+difficulty, repeated-move logic, or the LLM prompt in any way.
+
+Its only current downstream use is the standalone Managing Up resolver
+(`arena_brain/coaching.py::get_managing_up_guidance`): `BOSS` now
+deterministically activates the Managing Up coaching repertoire for future
+Coach use. No Coach endpoint or coaching behaviour is connected yet — the
+resolver exists and is tested, but nothing calls it. See
+`SEMANTIC_ARCHITECTURE.md` for the full rationale.
 
 ### Stance and temporary condition (optional)
 

@@ -1,5 +1,5 @@
 BOSS:
-  The current actor has direct managerial/formal authority over the user. Future activation point for Managing Up coaching - not yet implemented.
+  The current actor has direct managerial/formal authority over the user. Deterministically activates the Managing Up coaching repertoire (config/coach/managing_up.yaml) for future Coach use - no Coach endpoint is connected yet.
 PEER:
   The current actor has no direct managerial authority over the user, and the user has none over them. May still differ in seniority, influence, or political standing - do not assume equal footing.
 DIRECT_REPORT:

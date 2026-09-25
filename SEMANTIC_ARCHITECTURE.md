@@ -47,8 +47,9 @@ Room power difficulty = AMBER
 and plumbed (parsed, tracked, logged) but do **not** yet feed the remote
 LLM or influence any other layer — see section 4. They sit here in the
 stack conceptually, ahead of where later iterations will wire them in.
-`BOSS` is specifically the future activation point for Managing Up
-coaching — not implemented yet.
+`BOSS` now deterministically activates the Managing Up coaching repertoire
+for future Coach use (section 8) — no Coach endpoint or coaching behaviour
+is connected yet.
 
 ## 2. Ownership boundaries
 
@@ -56,7 +57,7 @@ coaching — not implemented yet.
 |---|---|---|
 | Stable persona (who someone is, voice, cadence, normal challenge style, dialogue examples) | SillyTavern | The character card, not this repo |
 | Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata (iteration one: not yet consumed downstream) | `config/power/power.yaml` |
-| Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata (iteration one: not yet consumed downstream) | `config/relationships/relationships.yaml` |
+| Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata; inert in actor generation, consumed only by the standalone Managing Up resolver (section 8) — no Coach path calls that resolver yet | `config/relationships/relationships.yaml` |
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
 | Move selection (the strategic conversational action) | This repo, deterministic Python | `arena_brain/engine.py::select_move` |
@@ -98,7 +99,7 @@ worked example above) — do not conflate it with power difficulty:
 
 | Value | Meaning |
 |---|---|
-| `BOSS` | The current actor has direct managerial/formal authority over the user. Future activation point for Managing Up coaching — not implemented yet |
+| `BOSS` | The current actor has direct managerial/formal authority over the user. Deterministically activates the Managing Up coaching repertoire (section 8) for future Coach use — no Coach endpoint is connected yet |
 | `PEER` | The current actor has no direct managerial authority over the user, and the user has none over them. May still differ in seniority, influence, or political standing — do not assume equal footing |
 | `DIRECT_REPORT` | The user has formal managerial authority over the current actor. Future activation point for leadership/delegation coaching — not implemented yet |
 
@@ -112,8 +113,9 @@ scenarios prove it too coarse.
 as power difficulty. It is parsed, tracked, and logged, but must not affect
 move selection, stance, condition, power difficulty, repeated-move logic,
 or rendering, and must not inject any guidance into the LLM prompt. `BOSS`
-will later be an input to Managing Up coaching — that behaviour is not
-implemented here.
+now deterministically activates the Managing Up coaching repertoire (see
+section 8) — but that repertoire is a standalone resolver nothing calls
+yet, not something wired into this actor-generation path.
 
 **Stance** (`config/stances/stances.yaml`) — the actor's attitude toward the
 current proposal/discussion, independent of their stable personality:
@@ -148,8 +150,9 @@ not replace the person with a caricature.
   later task that decides how it actually affects behaviour.
 - **Relationship does not change move selection, stance, condition, power
   difficulty, repeated-move logic, or rendering.** It is parsed and logged
-  (`relationship=...`) and nothing else for now. `BOSS` will later gate
-  Managing Up coaching — not yet.
+  (`relationship=...`) and remains inert throughout actor generation.
+  `BOSS` does now deterministically gate the standalone Managing Up
+  resolver (section 8) — but no Coach path calls that resolver yet.
 - **Stance does not change move selection.** Temporary condition does not
   change move selection. They only change how the selected move is
   expressed.
@@ -210,9 +213,9 @@ Do **not**:
   explicitly authorises it. Iteration one is parsing, tracking, and logging
   only.
 - Let relationship influence move selection, stance, condition, power
-  difficulty, repeated-move logic, rendering, or Coach behaviour until a
-  later task explicitly authorises it — including Managing Up coaching for
-  `BOSS`. Iteration one is parsing, tracking, and logging only.
+  difficulty, repeated-move logic, or rendering. It remains inert
+  throughout actor generation permanently, not just "for now" — its only
+  authorised downstream consumer is the Managing Up resolver (section 8).
 - Conflate relationship (actor-to-user authority) with power difficulty
   (room-wide political difficulty). They are independent and must stay
   that way in code, config, and prompts.
