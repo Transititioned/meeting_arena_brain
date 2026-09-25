@@ -82,6 +82,44 @@ GET http://127.0.0.1:8765/health
 GET http://127.0.0.1:8765/v1/models
 ```
 
+`/health` also reports the currently configured actor and Coach models.
+
+## Model configuration
+
+The actor lane (`POST /v1/chat/completions`) and Coach lane
+(`POST /v1/coach`) use independently configurable OpenAI models, set via
+environment variables **before** starting the server:
+
+```powershell
+$env:ARENA_ACTOR_MODEL="gpt-4o-mini"
+$env:ARENA_COACH_MODEL="some-model-we-want-to-test"
+$env:OPENAI_API_KEY="..."
+
+.\scripts\run-brain.cmd
+```
+
+- Both default to `gpt-4o-mini` if unset or blank — today's known-working
+  behaviour is unchanged unless you explicitly set either variable.
+- They are fully independent: changing `ARENA_COACH_MODEL` never affects
+  roleplay, and changing `ARENA_ACTOR_MODEL` never affects Coach.
+- **SillyTavern's selected model is not authoritative.** The Brain always
+  overwrites the outgoing `model` field with `ARENA_ACTOR_MODEL` before
+  forwarding to OpenAI, regardless of what SillyTavern's connection sends —
+  this avoids the Brain and SillyTavern fighting over model selection. No
+  change to your SillyTavern connection settings is needed to test a
+  different Coach model.
+- The OpenAI account/project behind `OPENAI_API_KEY` must actually have
+  permission to use whichever model you configure. If it doesn't, the
+  request fails visibly (a `502` from that endpoint, with the failure
+  logged) — there is no silent fallback to `gpt-4o-mini`, since that would
+  make comparing model quality misleading.
+- Model identifiers are not validated against a fixed list, since account
+  and project access to specific models changes over time.
+
+To manually test a candidate Coach model without touching SillyTavern at
+all, set `ARENA_COACH_MODEL` and call `/v1/coach` directly (see the Coach
+section below) — the actor path is completely unaffected.
+
 ## SillyTavern connection
 
 Use an OpenAI-compatible chat completion connection:

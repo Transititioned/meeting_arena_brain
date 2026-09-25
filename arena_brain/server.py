@@ -25,10 +25,9 @@ from arena_brain.engine import (
     select_move,
     strip_actor_markers_from_messages,
 )
-
+from arena_brain.settings import get_actor_model, get_coach_model
 
 OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
-MODEL = "gpt-4o-mini"
 ROOT = Path(__file__).resolve().parents[1]
 MOVE_GUIDANCE = load_move_guidance(ROOT / "config" / "moves" / "moves.yaml")
 STANCE_GUIDANCE = load_named_guidance(ROOT / "config" / "stances" / "stances.yaml")
@@ -42,7 +41,11 @@ app.include_router(coach_router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "actor_model": get_actor_model(),
+        "coach_model": get_coach_model(),
+    }
 
 
 @app.get("/v1/models")
@@ -51,7 +54,7 @@ def models() -> dict[str, Any]:
         "object": "list",
         "data": [
             {
-                "id": MODEL,
+                "id": get_actor_model(),
                 "object": "model",
                 "created": 0,
                 "owned_by": "openai",
@@ -99,8 +102,13 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
         repeated_move = previous_move == selected_move
     clean_messages = strip_actor_markers_from_messages(messages)
 
+    # ARENA_ACTOR_MODEL (default gpt-4o-mini) is authoritative here: any
+    # "model" SillyTavern sent in the incoming payload is overwritten, not
+    # negotiated with. See SEMANTIC_ARCHITECTURE.md - the Brain, not
+    # SillyTavern, owns actor model selection.
+    actor_model = get_actor_model()
     outbound = dict(payload)
-    outbound["model"] = MODEL
+    outbound["model"] = actor_model
     outbound["messages"] = clean_messages
     if actor_id and selected_move:
         instruction = build_behavior_instruction(
@@ -136,7 +144,7 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
             previous_move.value if previous_move else "none",
             repeated_move,
             user_text[:120],
-            MODEL,
+            actor_model,
             status_code,
             elapsed_ms,
         )
@@ -156,7 +164,7 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
             previous_move.value if previous_move else "none",
             repeated_move,
             user_text[:120],
-            MODEL,
+            actor_model,
             status_code or "transport_error",
             elapsed_ms,
         )

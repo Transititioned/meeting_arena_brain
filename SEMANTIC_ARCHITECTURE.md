@@ -62,7 +62,8 @@ LLM call. That Coach path is now implemented as an MVP.
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
 | Move selection (the strategic conversational action) | This repo, deterministic Python | `arena_brain/engine.py::select_move` |
-| Natural wording | The remote LLM | One call per actor response |
+| Natural wording | The remote LLM | One call per actor response, one per explicit Coach request |
+| Which remote model each lane uses | This repo, independent per lane (section 9) | `arena_brain/settings.py` (`ARENA_ACTOR_MODEL` / `ARENA_COACH_MODEL`) |
 
 The actor ID (`priya` / `marcus` / `dana`) stays in the brain purely for
 **routing**: which move guidance applies, which repeated-move history to
@@ -250,6 +251,20 @@ Do **not**:
   rendering constraints and SillyTavern's own dialogue examples aren't
   doing their job. A correct move selection and a good rendering are two
   different kinds of correctness — don't conflate them when debugging.
+- Build a generic "mega prompt builder" shared by the actor and Coach
+  lanes, or combine their config directories. Shared *parsing* utilities in
+  `arena_brain/engine.py` are fine; shared *behavioural prompt composition*
+  is not (section 9).
+- Let a model swap justify moving behaviour across the actor/Coach
+  boundary. `ARENA_ACTOR_MODEL`/`ARENA_COACH_MODEL` change which renderer a
+  lane uses, never which layer owns which behaviour (section 9).
+- Let SillyTavern's `model` field win over `ARENA_ACTOR_MODEL`, or let
+  Coach model selection depend on the incoming actor payload/model in any
+  way (section 9).
+- Silently retry a rejected configured model against the default. Model
+  access failures must surface visibly (section 9).
+- Validate `ARENA_ACTOR_MODEL`/`ARENA_COACH_MODEL` against a hardcoded list
+  of known OpenAI models. Account/project access changes over time.
 
 ## 7. Worked example
 
@@ -351,3 +366,99 @@ ratings, skill histories, session storage, automatic/implicit Coach
 invocation, a Coach UI or SillyTavern Quick Reply, power-difficulty or
 stance/condition Coach logic, and full-conversation summarisation. These
 are later tasks.
+
+## 9. Two behaviour lanes and independent model configuration
+
+Sections 1–8 describe *what* each layer owns. This section makes explicit
+*where the line is drawn* between the two behaviour lanes that exist in
+this codebase, and states that each lane's remote model is an independent,
+swappable execution detail — never a reason to move behavioural ownership
+across the line.
+
+```
+ACTOR LANE                                  COACH LANE
+
+Purpose: generate believable               Purpose: evaluate the USER'S
+colleague dialogue                         communication, one observation
+
+SillyTavern persona                        recent stripped conversation
++ Power metadata                           + user's latest response, verbatim
++ Relationship metadata                    + actor ID where available
++ Stance                                   + Relationship
++ Condition                                + generic Coach rubric
++ deterministic Move                       + Managing Up repertoire (BOSS only)
++ lightweight (repeated-move) context
+        ↓                                          ↓
+   ARENA_ACTOR_MODEL                          ARENA_COACH_MODEL
+   (default gpt-4o-mini)                      (default gpt-4o-mini)
+        ↓                                          ↓
+believable colleague response              one useful coaching observation
+
+Code: arena_brain/engine.py,               Code: arena_brain/coaching.py,
+build_behavior_instruction(),              build_coach_context(),
+move/stance/condition config,              build_coach_prompt(),
+SillyTavern persona cards                  arena_brain/coach_api.py,
+                                            config/coach/
+Endpoint: POST /v1/chat/completions        Endpoint: POST /v1/coach
+                                            (explicit user action only)
+```
+
+**The actor lane must never consume:** the Managing Up repertoire, the
+generic Coach rubric, coaching feedback instructions, any evaluation of the
+user's communication, or `ARENA_COACH_MODEL`.
+
+**The Coach lane must never consume:** actor move selection or its
+guidance, stance/condition rendering guidance, actor persona construction,
+repeated-move logic, or `ARENA_ACTOR_MODEL`.
+
+Shared low-level utilities are fine where genuinely generic (both lanes
+reuse `find_actor_id`, `find_relationship`, `latest_user_text`,
+`strip_actor_markers_from_messages`, `load_named_guidance` from
+`arena_brain/engine.py` — none of these are behavioural, they're parsing).
+What must **never** be shared is behavioural prompt composition: there is
+no generic "mega prompt builder", and Actor and Coach configuration
+(`config/moves/`, `config/stances/`, `config/conditions/` vs.
+`config/coach/`) are never combined.
+
+**Model configuration** (`arena_brain/settings.py`):
+
+| | Env var | Default | Used by |
+|---|---|---|---|
+| Actor model | `ARENA_ACTOR_MODEL` | `gpt-4o-mini` | `POST /v1/chat/completions` |
+| Coach model | `ARENA_COACH_MODEL` | `gpt-4o-mini` | `POST /v1/coach` |
+
+Missing or blank (after stripping whitespace) falls back to the default.
+Arbitrary model identifiers are accepted without validation against a
+hardcoded list — which models an OpenAI account/project can actually use
+changes over time, and this code must not assume otherwise.
+
+**Meeting Arena Brain, not SillyTavern, is authoritative for the actor
+model.** Whatever `model` value SillyTavern sends in the incoming
+`/v1/chat/completions` payload is overwritten with `ARENA_ACTOR_MODEL`, not
+negotiated with — this avoids the Brain and SillyTavern fighting over model
+selection. Coach model selection is entirely independent of both: it never
+reads the incoming payload's `model` field and never depends on
+`ARENA_ACTOR_MODEL`.
+
+**No silent fallback.** If a configured model is rejected upstream (e.g.
+the OpenAI account/project lacks access to it), that failure must surface
+as a normal `502`, not be swallowed and silently retried against
+`gpt-4o-mini`. A silent fallback would make model-quality benchmarking
+(the reason this configuration exists) actively misleading. Solving OpenAI
+account/project access itself is out of scope here — this only guarantees
+the failure is visible.
+
+**Model choice is an execution/configuration concern, not a behavioural
+ownership concern.** A stronger Coach model never justifies moving actor
+behaviour, persona, or move selection into the Coach lane. A cheaper actor
+model never justifies leaking coaching logic into the actor prompt.
+Changing `ARENA_ACTOR_MODEL` or `ARENA_COACH_MODEL` changes which
+renderer/reasoner a lane uses — it must never change which layer owns which
+behaviour.
+
+`GET /v1/models` reports the currently configured actor model only (what
+SillyTavern's connection settings expect to see) — Coach is deliberately
+**not** exposed there as another selectable chat model; it remains a
+separate endpoint. `GET /health` additionally reports both
+`actor_model` and `coach_model` for a quick manual check before a
+benchmarking run, without overloading the SillyTavern-facing endpoint.
