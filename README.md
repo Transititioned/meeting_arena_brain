@@ -6,8 +6,8 @@ move from the latest user utterance, injects one compact behavioural instruction
 and forwards the request to OpenAI `gpt-4o-mini`.
 
 > **Before changing persona, power difficulty, relationship, stance,
-> condition, move selection, or prompt composition, read
-> [`SEMANTIC_ARCHITECTURE.md`](SEMANTIC_ARCHITECTURE.md).**
+> condition, move selection, prompt composition, or Managing Up/Coach
+> behaviour, read [`SEMANTIC_ARCHITECTURE.md`](SEMANTIC_ARCHITECTURE.md).**
 > It is the authoritative record of which layer owns what, and a lot of
 > iterative work went into keeping those layers separate — please don't
 > re-merge them without reading it first.

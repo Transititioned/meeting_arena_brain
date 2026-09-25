@@ -785,3 +785,121 @@ def test_relationship_marker_does_not_change_selected_move(
     instructions = [call["messages"][0]["content"] for call in captured]
     assert "Selected move: CLARIFY_BLOCKER" in instructions[0]
     assert "Selected move: CLARIFY_BLOCKER" in instructions[1]
+
+
+def test_managing_up_terms_not_in_actor_instruction_when_boss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Managing Up belongs to the future Coach path, not actor generation.
+    relationship=BOSS must not leak any Managing Up material into the
+    normal actor behavioural instruction, and must not trigger an extra
+    upstream call - the coaching module is never imported by server.py."""
+    captured: dict[str, Any] = {}
+    call_count = 0
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self) -> dict[str, Any]:
+            return {"id": "fake", "choices": []}
+
+    class FakeAsyncClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+        async def post(
+            self, url: str, headers: dict[str, str], json: dict[str, Any]
+        ) -> FakeResponse:
+            nonlocal call_count
+            call_count += 1
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Are we ready?",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    instruction = captured["json"]["messages"][0]["content"]
+    for term in (
+        "Managing Up",
+        "ALIGN_BEFORE_CHALLENGE",
+        "CLARIFY_PRIORITY",
+        "STATE_CONSTRAINT",
+        "OFFER_OPTIONS",
+        "PROTECT_ACCOUNTABILITY",
+        "CONFIRM_AND_RECORD",
+    ):
+        assert term not in instruction
+    assert call_count == 1
+
+
+def test_relationship_boss_does_not_otherwise_change_outbound_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Outside of the [ARENA_RELATIONSHIP=...] marker itself being stripped
+    and logged, the outbound request to OpenAI must be identical whether or
+    not the actor's relationship is BOSS."""
+    captured: list[dict[str, Any]] = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self) -> dict[str, Any]:
+            return {"id": "fake", "choices": []}
+
+    class FakeAsyncClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+        async def post(
+            self, url: str, headers: dict[str, str], json: dict[str, Any]
+        ) -> FakeResponse:
+            captured.append(json)
+            return FakeResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    client = TestClient(app)
+    for relationship_marker in ("", "[ARENA_RELATIONSHIP=boss] "):
+        client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"[ARENA_ACTOR=priya] {relationship_marker}Are we ready?",
+                    }
+                ],
+            },
+        )
+
+    without_boss, with_boss = captured
+    assert without_boss["model"] == with_boss["model"]
+    assert without_boss["messages"][0]["content"] == with_boss["messages"][0]["content"]
+    assert without_boss["messages"][1]["content"] == with_boss["messages"][1]["content"]

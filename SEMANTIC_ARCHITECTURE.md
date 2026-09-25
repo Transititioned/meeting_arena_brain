@@ -219,6 +219,14 @@ Do **not**:
 - Add `SENIOR_STAKEHOLDER` or any other relationship value beyond
   `BOSS`/`PEER`/`DIRECT_REPORT` without a real scenario proving the current
   vocabulary is too coarse.
+- Import `arena_brain.coaching` from `arena_brain/server.py`'s actor-
+  generation path, or otherwise let Managing Up material reach
+  `build_behavior_instruction()` or the actor's outbound prompt. Managing
+  Up belongs exclusively to the not-yet-built Coach path (section 8).
+- Turn the Managing Up repertoire into a six-item checklist a response must
+  satisfy, or write it as a phrasebook of canned lines ("I appreciate your
+  input...", "I hear what you're saying..."). It is a repertoire of logic a
+  future Coach draws one or two relevant items from, not a script.
 - Make "difficult" behaviour synonymous with hostility.
 - Create one persona per stance/condition combination.
 - Introduce session storage solely to support repeat-move behaviour.
@@ -249,3 +257,77 @@ Priya persona (SillyTavern character card)
 The exact sentence the LLM renders is not part of this architecture — only
 the composition (persona + stance + condition + move) and the constraint
 that the move stays legible through all of it.
+
+## 8. Managing Up (Coach path, not implemented)
+
+**Relationship and Managing Up are not the same thing — do not conflate
+them:**
+
+| | Relationship | Managing Up |
+|---|---|---|
+| What it is | Factual actor-to-user authority metadata | A Coach-side behavioural evaluation lens |
+| Where it lives | `arena_brain/engine.py` (`find_relationship`), consumed by the actor-generation path | `arena_brain/coaching.py`, consumed by nothing yet — a future Coach path |
+| What it evaluates | Nothing — it's a label | How the **user** communicated with an actor who has formal authority over them |
+| Activation | Set explicitly via `[ARENA_RELATIONSHIP=...]` | Deterministically derived: active only when `relationship == BOSS` |
+
+Managing Up is **not** actor persona, stance, condition, power difficulty,
+an actor conversational move, or a political-event classifier. It does not
+appear as another layer in the actor-generation composition stack in
+section 1 — it belongs to a separate, not-yet-built Coach path:
+
+```
+ACTOR GENERATION (implemented)
+
+  Persona
+  + Power
+  + Relationship metadata
+  + Stance
+  + Condition
+  + Move
+  → actor rendering (one LLM call)
+
+
+FUTURE COACH PATH (not implemented in this iteration)
+
+  User's verbatim response
+  + conversation context
+  + Relationship
+  + relevant coaching rubric
+
+  if Relationship == BOSS:
+      include the Managing Up repertoire (config/coach/managing_up.yaml,
+      arena_brain/coaching.py::get_managing_up_guidance)
+
+  → one useful coaching intervention
+```
+
+**The Managing Up repertoire** (`config/coach/managing_up.yaml`) is six
+canonical principles, each capturing a piece of communication *logic*, not
+canned phrasing:
+
+| Principle | Logic |
+|---|---|
+| `ALIGN_BEFORE_CHALLENGE` | Briefly recognise the boss's direction/authority before presenting a different view — alignment signalling, not automatic agreement |
+| `CLARIFY_PRIORITY` | When instructions or priorities conflict, make the decision point explicit rather than silently absorbing incompatible directions |
+| `STATE_CONSTRAINT` | State a genuine constraint/risk/trade-off factually and concisely — decision-quality information, not self-justification |
+| `OFFER_OPTIONS` | Give workable choices or a recommendation rather than just a problem — preserve the boss's decision authority |
+| `PROTECT_ACCOUNTABILITY` | Make ownership and changed responsibilities explicit when necessary, without becoming territorial |
+| `CONFIRM_AND_RECORD` | Close material discussions with a clear decision, owner, and next action; selective written follow-up when direction/accountability materially changes |
+
+**This is a repertoire, not a checklist.** A good user response typically
+draws on one or two of these, not all six. The future Coach should identify
+the single most relevant missed or effective behaviour, not produce a
+six-point scorecard against every utterance. Believable human communication
+matters more than mechanically demonstrating a framework.
+
+`get_managing_up_guidance(relationship_name)` returns the full
+`{PRINCIPLE: guidance}` mapping when `relationship_name == "BOSS"`, and
+`None` (never an empty dict — consistent with how every other layer signals
+"no override" in this codebase) for `PEER`, `DIRECT_REPORT`, missing, or
+unknown relationships. It is deterministic, has no LLM call, and is not
+imported anywhere in the current `POST /v1/chat/completions` path — the
+normal actor-generation flow is completely unaffected by its existence.
+
+**Not built in this iteration:** the Coach endpoint/mode itself, any
+scoring or classification, and any use of `get_managing_up_guidance` by
+anything at all. This section documents the intended future shape only.
