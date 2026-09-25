@@ -10,6 +10,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
+from arena_brain.coach_api import router as coach_router
 from arena_brain.engine import (
     build_behavior_instruction,
     find_actor_id,
@@ -36,6 +37,7 @@ CONDITION_GUIDANCE = load_named_guidance(ROOT / "config" / "conditions" / "condi
 app = FastAPI(title="Meeting Arena Brain")
 logger = logging.getLogger("arena_brain")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+app.include_router(coach_router)
 
 
 @app.get("/health")

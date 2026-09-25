@@ -153,18 +153,58 @@ Valid values and their definitions live in `config/relationships/relationships.y
 — a closed vocabulary, same as power/stance/condition. An unrecognised or
 omitted value is treated as no override.
 
-**Relationship remains inert in actor generation.** The marker is parsed,
-the latest applicable one in history wins, it's stripped before forwarding
-upstream, and it's logged (`relationship=BOSS` / `PEER` / `DIRECT_REPORT` /
-`none`) — but it does not affect move selection, stance, condition, power
-difficulty, repeated-move logic, or the LLM prompt in any way.
+**Relationship remains permanently inert in actor generation.** The marker
+is parsed, the latest applicable one in history wins, it's stripped before
+forwarding upstream, and it's logged (`relationship=BOSS` / `PEER` /
+`DIRECT_REPORT` / `none`) — but it never affects move selection, stance,
+condition, power difficulty, repeated-move logic, or the actor's own LLM
+prompt (`POST /v1/chat/completions`).
 
-Its only current downstream use is the standalone Managing Up resolver
-(`arena_brain/coaching.py::get_managing_up_guidance`): `BOSS` now
-deterministically activates the Managing Up coaching repertoire for future
-Coach use. No Coach endpoint or coaching behaviour is connected yet — the
-resolver exists and is tested, but nothing calls it. See
+Its one downstream use is the Managing Up resolver, consumed by the
+separate `POST /v1/coach` endpoint below: `BOSS` deterministically
+activates the Managing Up coaching repertoire in that Coach prompt. See
 `SEMANTIC_ARCHITECTURE.md` for the full rationale.
+
+## Coach (on-demand, `POST /v1/coach`)
+
+An explicit, separate endpoint — never called automatically after an actor
+response. Given the same SillyTavern-style `messages` history, it derives
+actor/relationship from the existing markers, builds a small deterministic
+context window (up to the most recent 8 user/assistant messages, markers
+stripped, system messages excluded), and makes exactly one LLM call to give
+one concise (~100 word) coaching observation. When the current actor's
+relationship is `BOSS`, the Managing Up repertoire is included; otherwise
+the Coach still gives generic communication feedback.
+
+Request:
+
+```json
+{ "messages": [ { "role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Yep, will do." } ] }
+```
+
+Response:
+
+```json
+{ "feedback": "...", "relationship": "BOSS", "actor": "priya" }
+```
+
+Manual test from PowerShell (server must already be running via
+`scripts\run-brain.cmd`, and `OPENAI_API_KEY` must be set to a real key for
+a real response — this will make one live OpenAI call):
+
+```powershell
+$body = @{
+    messages = @(
+        @{ role = "user"; content = "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Yep, will do." }
+    )
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod `
+    -Method Post `
+    -Uri http://127.0.0.1:8765/v1/coach `
+    -ContentType "application/json" `
+    -Body $body
+```
 
 ### Stance and temporary condition (optional)
 

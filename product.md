@@ -54,7 +54,7 @@ The wider Meeting Arena product uses:
 
 \- a remote LLM for natural-language rendering
 
-\- Coach as an on-demand training mode (not yet implemented; its first deterministic building block — the Managing Up coaching repertoire, activated when relationship=BOSS — exists, see \`SEMANTIC\_ARCHITECTURE.md\`)
+\- Coach as an on-demand training mode: an MVP backend exists (\`POST /v1/coach\`, explicit user action only, one LLM call, Managing Up repertoire activated when relationship=BOSS) — no Coach UI, scoring, or automatic invocation yet; see \`SEMANTIC\_ARCHITECTURE.md\`
 
 
 

@@ -43,13 +43,14 @@ Room power difficulty = AMBER
   Dana   relationship = PEER
 ```
 
-**Iteration-one note:** both power difficulty and relationship are defined
-and plumbed (parsed, tracked, logged) but do **not** yet feed the remote
-LLM or influence any other layer — see section 4. They sit here in the
-stack conceptually, ahead of where later iterations will wire them in.
-`BOSS` now deterministically activates the Managing Up coaching repertoire
-for future Coach use (section 8) — no Coach endpoint or coaching behaviour
-is connected yet.
+**Iteration-one note:** power difficulty is fully inert — defined and
+plumbed (parsed, tracked, logged) but does **not** yet feed any remote LLM
+or influence any other layer; see section 4. Relationship is likewise
+permanently inert in *actor generation* (never reaches the actor-rendering
+LLM call), but it now has exactly one downstream consumer: `BOSS`
+deterministically activates the Managing Up repertoire for the explicit
+Coach path (`POST /v1/coach`, section 8), which does make its own, separate
+LLM call. That Coach path is now implemented as an MVP.
 
 ## 2. Ownership boundaries
 
@@ -57,7 +58,7 @@ is connected yet.
 |---|---|---|
 | Stable persona (who someone is, voice, cadence, normal challenge style, dialogue examples) | SillyTavern | The character card, not this repo |
 | Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata (iteration one: not yet consumed downstream) | `config/power/power.yaml` |
-| Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata; inert in actor generation, consumed only by the standalone Managing Up resolver (section 8) — no Coach path calls that resolver yet | `config/relationships/relationships.yaml` |
+| Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata; permanently inert in actor generation. Its one downstream consumer is the Managing Up resolver (section 8), called by the Coach path (`POST /v1/coach`) | `config/relationships/relationships.yaml` |
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
 | Move selection (the strategic conversational action) | This repo, deterministic Python | `arena_brain/engine.py::select_move` |
@@ -99,7 +100,7 @@ worked example above) — do not conflate it with power difficulty:
 
 | Value | Meaning |
 |---|---|
-| `BOSS` | The current actor has direct managerial/formal authority over the user. Deterministically activates the Managing Up coaching repertoire (section 8) for future Coach use — no Coach endpoint is connected yet |
+| `BOSS` | The current actor has direct managerial/formal authority over the user. Deterministically activates the Managing Up coaching repertoire in the Coach path (section 8, `POST /v1/coach`) |
 | `PEER` | The current actor has no direct managerial authority over the user, and the user has none over them. May still differ in seniority, influence, or political standing — do not assume equal footing |
 | `DIRECT_REPORT` | The user has formal managerial authority over the current actor. Future activation point for leadership/delegation coaching — not implemented yet |
 
@@ -109,13 +110,14 @@ political/event tags are where influence and political threat get
 captured, not relationship. Extend this vocabulary later only if real
 scenarios prove it too coarse.
 
-**Iteration-one rule:** `ARENA_RELATIONSHIP` is control metadata only, same
-as power difficulty. It is parsed, tracked, and logged, but must not affect
-move selection, stance, condition, power difficulty, repeated-move logic,
-or rendering, and must not inject any guidance into the LLM prompt. `BOSS`
-now deterministically activates the Managing Up coaching repertoire (see
-section 8) — but that repertoire is a standalone resolver nothing calls
-yet, not something wired into this actor-generation path.
+**Iteration-one rule:** `ARENA_RELATIONSHIP` is control metadata only with
+respect to actor generation. It is parsed, tracked, and logged, but must
+not affect move selection, stance, condition, power difficulty,
+repeated-move logic, or rendering, and must never inject any guidance into
+the *actor's* LLM prompt (`build_behavior_instruction()`). `BOSS` does
+deterministically activate the Managing Up coaching repertoire (section 8)
+— but that only reaches the separate, explicit Coach path (`POST
+/v1/coach`), never the actor-generation path.
 
 **Stance** (`config/stances/stances.yaml`) — the actor's attitude toward the
 current proposal/discussion, independent of their stable personality:
@@ -150,9 +152,10 @@ not replace the person with a caricature.
   later task that decides how it actually affects behaviour.
 - **Relationship does not change move selection, stance, condition, power
   difficulty, repeated-move logic, or rendering.** It is parsed and logged
-  (`relationship=...`) and remains inert throughout actor generation.
-  `BOSS` does now deterministically gate the standalone Managing Up
-  resolver (section 8) — but no Coach path calls that resolver yet.
+  (`relationship=...`) and remains permanently inert throughout actor
+  generation. `BOSS` does deterministically gate the Managing Up repertoire
+  (section 8), but only for the separate, explicit Coach path
+  (`POST /v1/coach`) — never for actor generation.
 - **Stance does not change move selection.** Temporary condition does not
   change move selection. They only change how the selected move is
   expressed.
@@ -223,13 +226,18 @@ Do **not**:
   `BOSS`/`PEER`/`DIRECT_REPORT` without a real scenario proving the current
   vocabulary is too coarse.
 - Import `arena_brain.coaching` from `arena_brain/server.py`'s actor-
-  generation path, or otherwise let Managing Up material reach
-  `build_behavior_instruction()` or the actor's outbound prompt. Managing
-  Up belongs exclusively to the not-yet-built Coach path (section 8).
+  generation path (`chat_completions`), or otherwise let Managing Up
+  material reach `build_behavior_instruction()` or the actor's outbound
+  prompt. Managing Up belongs exclusively to the Coach path (section 8),
+  routed through `arena_brain/coach_api.py`.
 - Turn the Managing Up repertoire into a six-item checklist a response must
   satisfy, or write it as a phrasebook of canned lines ("I appreciate your
-  input...", "I hear what you're saying..."). It is a repertoire of logic a
-  future Coach draws one or two relevant items from, not a script.
+  input...", "I hear what you're saying..."). It is a repertoire of logic
+  the Coach draws one or two relevant items from, not a script.
+- Make `POST /v1/coach` fire automatically after an actor response, add a
+  classifier/reasoning call before it, chain a second call after it, or
+  otherwise break the one-explicit-request-per-one-LLM-call guarantee for
+  either path.
 - Make "difficult" behaviour synonymous with hostility.
 - Create one persona per stance/condition combination.
 - Introduce session storage solely to support repeat-move behaviour.
@@ -261,7 +269,7 @@ The exact sentence the LLM renders is not part of this architecture — only
 the composition (persona + stance + condition + move) and the constraint
 that the move stays legible through all of it.
 
-## 8. Managing Up (Coach path, not implemented)
+## 8. Managing Up and the Coach path (MVP implemented)
 
 **Relationship and Managing Up are not the same thing — do not conflate
 them:**
@@ -269,40 +277,45 @@ them:**
 | | Relationship | Managing Up |
 |---|---|---|
 | What it is | Factual actor-to-user authority metadata | A Coach-side behavioural evaluation lens |
-| Where it lives | `arena_brain/engine.py` (`find_relationship`), consumed by the actor-generation path | `arena_brain/coaching.py`, consumed by nothing yet — a future Coach path |
+| Where it lives | `arena_brain/engine.py` (`find_relationship`), consumed by the actor-generation path (for routing/logging only — inert otherwise) | `arena_brain/coaching.py`, consumed by the Coach path (`arena_brain/coach_api.py`) |
 | What it evaluates | Nothing — it's a label | How the **user** communicated with an actor who has formal authority over them |
 | Activation | Set explicitly via `[ARENA_RELATIONSHIP=...]` | Deterministically derived: active only when `relationship == BOSS` |
 
 Managing Up is **not** actor persona, stance, condition, power difficulty,
 an actor conversational move, or a political-event classifier. It does not
 appear as another layer in the actor-generation composition stack in
-section 1 — it belongs to a separate, not-yet-built Coach path:
+section 1 — it lives entirely in the separate, explicit Coach path:
 
 ```
-ACTOR GENERATION (implemented)
+ACTOR PATH (unchanged by this task)
 
-  Persona
-  + Power
-  + Relationship metadata
-  + Stance
-  + Condition
-  + Move
-  → actor rendering (one LLM call)
+  SillyTavern → POST /v1/chat/completions
+    Persona + Power + Relationship metadata + Stance + Condition + Move
+    → actor rendering (one LLM call)
 
 
-FUTURE COACH PATH (not implemented in this iteration)
+COACH PATH (this task's MVP — POST /v1/coach, explicit user action only)
 
-  User's verbatim response
-  + conversation context
-  + Relationship
-  + relevant coaching rubric
+  deterministic context assembly (arena_brain/coaching.py::build_coach_context):
+    up to 8 most recent user/assistant messages (system messages excluded,
+    machine-control markers stripped, order preserved)
+    + current actor (find_actor_id)
+    + current relationship (find_relationship)
+    + the user's latest utterance, verbatim (latest_user_text)
 
-  if Relationship == BOSS:
-      include the Managing Up repertoire (config/coach/managing_up.yaml,
-      arena_brain/coaching.py::get_managing_up_guidance)
+  deterministic prompt assembly (arena_brain/coaching.py::build_coach_prompt):
+    generic Coach rubric
+    + if relationship == BOSS: the Managing Up repertoire
+    + the assembled context, with the verbatim utterance delimited
 
-  → one useful coaching intervention
+  → exactly one Coach LLM call (arena_brain/coach_api.py)
+  → one concise coaching observation, JSON: {"feedback": "...", ...}
 ```
+
+Both call paths use the same model (`gpt-4o-mini`) and the same
+`OPENAI_API_KEY`, but they are two entirely separate, explicitly-triggered
+requests — Coach never fires automatically after an actor response, and
+never chains a second call after itself.
 
 **The Managing Up repertoire** (`config/coach/managing_up.yaml`) is six
 canonical principles, each capturing a piece of communication *logic*, not
@@ -318,19 +331,23 @@ canned phrasing:
 | `CONFIRM_AND_RECORD` | Close material discussions with a clear decision, owner, and next action; selective written follow-up when direction/accountability materially changes |
 
 **This is a repertoire, not a checklist.** A good user response typically
-draws on one or two of these, not all six. The future Coach should identify
-the single most relevant missed or effective behaviour, not produce a
-six-point scorecard against every utterance. Believable human communication
-matters more than mechanically demonstrating a framework.
+draws on one or two of these, not all six. The Coach identifies the single
+most relevant missed or effective behaviour, never a six-point scorecard.
+Believable human communication matters more than mechanically demonstrating
+a framework — the Coach is explicitly instructed not to invent a flaw just
+because it was invoked, and to say briefly what worked when a short reply
+(e.g. "Yep, will do.") was already adequate.
 
 `get_managing_up_guidance(relationship_name)` returns the full
 `{PRINCIPLE: guidance}` mapping when `relationship_name == "BOSS"`, and
 `None` (never an empty dict — consistent with how every other layer signals
 "no override" in this codebase) for `PEER`, `DIRECT_REPORT`, missing, or
-unknown relationships. It is deterministic, has no LLM call, and is not
-imported anywhere in the current `POST /v1/chat/completions` path — the
-normal actor-generation flow is completely unaffected by its existence.
+unknown relationships. It is deterministic, has no LLM call of its own, and
+is still not imported anywhere in `POST /v1/chat/completions` — the actor
+path is structurally unaffected by the Coach path's existence.
 
-**Not built in this iteration:** the Coach endpoint/mode itself, any
-scoring or classification, and any use of `get_managing_up_guidance` by
-anything at all. This section documents the intended future shape only.
+**MVP scope, deliberately not built here:** Coach scoring, numerical
+ratings, skill histories, session storage, automatic/implicit Coach
+invocation, a Coach UI or SillyTavern Quick Reply, power-difficulty or
+stance/condition Coach logic, and full-conversation summarisation. These
+are later tasks.
