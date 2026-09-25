@@ -5,8 +5,8 @@ OpenAI-compatible proxy for SillyTavern, chooses a deterministic conversational
 move from the latest user utterance, injects one compact behavioural instruction,
 and forwards the request to OpenAI `gpt-4o-mini`.
 
-> **Before changing persona, power difficulty, stance, condition, move
-> selection, or prompt composition, read
+> **Before changing persona, power difficulty, relationship, stance,
+> condition, move selection, or prompt composition, read
 > [`SEMANTIC_ARCHITECTURE.md`](SEMANTIC_ARCHITECTURE.md).**
 > It is the authoritative record of which layer owns what, and a lot of
 > iterative work went into keeping those layers separate — please don't
@@ -98,9 +98,10 @@ This proxy does not support streaming responses yet. Leave Streaming off in
 SillyTavern's connection settings — a `stream: true` request is rejected
 with a clear `400` error rather than being silently mishandled.
 
-Actor, power, stance, and condition markers are stripped before the
-conversation is forwarded to OpenAI; they are plumbing for the brain, not
-dialogue. Include one actor marker somewhere in the incoming conversation:
+Actor, power, relationship, stance, and condition markers are stripped
+before the conversation is forwarded to OpenAI; they are plumbing for the
+brain, not dialogue. Include one actor marker somewhere in the incoming
+conversation:
 
 ```text
 [ARENA_ACTOR=priya]
@@ -133,6 +134,32 @@ upstream, and it's logged (`power=GREEN` / `power=AMBER` / `power=RED` /
 `power=none`) — but it does not yet affect move selection, stance,
 condition, repeated-move logic, or the LLM prompt in any way. See
 `SEMANTIC_ARCHITECTURE.md` for the full rationale.
+
+### Relationship / authority (optional, metadata only for now)
+
+Relationship is **actor-to-user** metadata — the current actor's formal
+authority relationship to the user, not a room-wide scenario property (that's
+power difficulty; see above). In one multi-person meeting different actors
+can carry different relationship values while power difficulty stays
+constant for the room:
+
+```text
+[ARENA_RELATIONSHIP=boss]
+[ARENA_RELATIONSHIP=peer]
+[ARENA_RELATIONSHIP=direct_report]
+```
+
+Valid values and their definitions live in `config/relationships/relationships.yaml`
+— a closed vocabulary, same as power/stance/condition. An unrecognised or
+omitted value is treated as no override.
+
+**This is plumbing only in this iteration.** The marker is parsed, the
+latest applicable one in history wins, it's stripped before forwarding
+upstream, and it's logged (`relationship=BOSS` / `PEER` / `DIRECT_REPORT` /
+`none`) — but it does not yet affect move selection, stance, condition,
+power difficulty, repeated-move logic, or the LLM prompt in any way. `BOSS`
+is the future activation point for Managing Up coaching, not implemented
+yet. See `SEMANTIC_ARCHITECTURE.md` for the full rationale.
 
 ### Stance and temporary condition (optional)
 

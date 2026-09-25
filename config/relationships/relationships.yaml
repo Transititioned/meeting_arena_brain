@@ -1,0 +1,6 @@
+BOSS:
+  The current actor has direct managerial/formal authority over the user. Future activation point for Managing Up coaching - not yet implemented.
+PEER:
+  The current actor has no direct managerial authority over the user, and the user has none over them. May still differ in seniority, influence, or political standing - do not assume equal footing.
+DIRECT_REPORT:
+  The user has formal managerial authority over the current actor. Future activation point for leadership/delegation coaching - not yet implemented.

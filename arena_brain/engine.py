@@ -21,6 +21,8 @@ STANCE_MARKER_RE = re.compile(r"\[ARENA_STANCE=([A-Za-z_]*)\]", re.IGNORECASE)
 CONDITION_MARKER_RE = re.compile(r"\[ARENA_CONDITION=([A-Za-z_]*)\]", re.IGNORECASE)
 POWER_MARKER_RE = re.compile(r"\[ARENA_POWER=([A-Za-z_]*)\]", re.IGNORECASE)
 VALID_POWER_LEVELS = frozenset({"GREEN", "AMBER", "RED"})
+RELATIONSHIP_MARKER_RE = re.compile(r"\[ARENA_RELATIONSHIP=([A-Za-z_]*)\]", re.IGNORECASE)
+VALID_RELATIONSHIPS = frozenset({"BOSS", "PEER", "DIRECT_REPORT"})
 
 RULES: tuple[tuple[Move, tuple[str, ...]], ...] = (
     (
@@ -116,11 +118,23 @@ def parse_power_marker(text: str) -> str | None:
     return value if value in VALID_POWER_LEVELS else None
 
 
+def parse_relationship_marker(text: str) -> str | None:
+    """Parse [ARENA_RELATIONSHIP=...]: the current actor's formal authority
+    relationship to the user (actor-to-user, not room-wide like power
+    difficulty). Same enforced-at-parse-time closed vocabulary as power."""
+    match = RELATIONSHIP_MARKER_RE.search(text)
+    if not match or not match.group(1):
+        return None
+    value = match.group(1).upper()
+    return value if value in VALID_RELATIONSHIPS else None
+
+
 def strip_actor_markers(text: str) -> str:
     text = ACTOR_MARKER_RE.sub("", text)
     text = STANCE_MARKER_RE.sub("", text)
     text = CONDITION_MARKER_RE.sub("", text)
     text = POWER_MARKER_RE.sub("", text)
+    text = RELATIONSHIP_MARKER_RE.sub("", text)
     return text.strip()
 
 
@@ -182,6 +196,21 @@ def find_power(messages: list[dict[str, Any]]) -> str | None:
             power = parse_power_marker(content)
             if power:
                 return power
+    return None
+
+
+def find_relationship(messages: list[dict[str, Any]]) -> str | None:
+    """Actor-to-user relationship marker: BOSS/PEER/DIRECT_REPORT, latest
+    applicable (recognised) marker wins. Unlike power difficulty, this
+    describes the CURRENT ACTOR's formal authority relationship to the
+    user, not a room-wide scenario property. Control metadata only in this
+    iteration - see SEMANTIC_ARCHITECTURE.md."""
+    for message in reversed(messages):
+        content = message.get("content")
+        if isinstance(content, str):
+            relationship = parse_relationship_marker(content)
+            if relationship:
+                return relationship
     return None
 
 

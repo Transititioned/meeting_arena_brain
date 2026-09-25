@@ -6,6 +6,7 @@ from arena_brain.engine import (
     find_actor_id,
     find_condition,
     find_power,
+    find_relationship,
     find_stance,
     latest_user_text,
     load_move_guidance,
@@ -274,6 +275,116 @@ def test_power_metadata_does_not_change_move_selection() -> None:
             "role": "user",
             "content": "[ARENA_ACTOR=priya] [ARENA_POWER=red] I'm comfortable starting SIT, "
             "but I don't think we should call the environment issues resolved yet.",
+        }
+    ]
+    assert select_move(latest_user_text(messages)) == Move.CLARIFY_BLOCKER
+
+
+def test_relationship_guidance_loads() -> None:
+    guidance = load_named_guidance(Path("config/relationships/relationships.yaml"))
+    assert "BOSS" in guidance
+    assert "PEER" in guidance
+    assert "DIRECT_REPORT" in guidance
+
+
+def test_relationship_marker_parsing_boss() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Are we ready?"}
+    ]
+    assert find_relationship(messages) == "BOSS"
+
+
+def test_relationship_marker_parsing_peer() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=peer] Are we ready?"}
+    ]
+    assert find_relationship(messages) == "PEER"
+
+
+def test_relationship_marker_parsing_direct_report() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=direct_report] Are we ready?",
+        }
+    ]
+    assert find_relationship(messages) == "DIRECT_REPORT"
+
+
+def test_relationship_marker_case_insensitivity() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=BoSs] Are we ready?"}
+    ]
+    assert find_relationship(messages) == "BOSS"
+
+
+def test_missing_relationship_marker_returns_none() -> None:
+    messages = [{"role": "user", "content": "[ARENA_ACTOR=priya] Are we ready?"}]
+    assert find_relationship(messages) is None
+
+
+def test_empty_relationship_marker_resolves_to_no_override() -> None:
+    messages = [
+        {"role": "user", "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=] Are we ready?"}
+    ]
+    assert find_relationship(messages) is None
+
+
+def test_unknown_relationship_value_resolves_to_no_override() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=stakeholder] Are we ready?",
+        }
+    ]
+    assert find_relationship(messages) is None
+
+
+def test_latest_relationship_marker_wins_in_multi_message_history() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=peer] Are we ready to start SIT?",
+        },
+        {"role": "assistant", "content": "We still have two environment issues open."},
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] So can we call this ready to go?",
+        },
+    ]
+    assert find_relationship(messages) == "BOSS"
+
+
+def test_relationship_marker_stripped_from_messages() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+    assert "[ARENA_RELATIONSHIP=" not in cleaned[0]["content"]
+
+
+def test_unknown_relationship_marker_still_stripped_from_messages() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=stakeholder] Are we ready?",
+        }
+    ]
+    cleaned = strip_actor_markers_from_messages(messages)
+    assert cleaned[0]["content"] == "Are we ready?"
+    assert "[ARENA_RELATIONSHIP=" not in cleaned[0]["content"]
+
+
+def test_relationship_metadata_does_not_change_move_selection() -> None:
+    messages = [
+        {
+            "role": "user",
+            "content": "[ARENA_ACTOR=priya] [ARENA_RELATIONSHIP=boss] I'm comfortable starting "
+            "SIT, but I don't think we should call the environment issues resolved yet.",
         }
     ]
     assert select_move(latest_user_text(messages)) == Move.CLARIFY_BLOCKER

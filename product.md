@@ -142,7 +142,7 @@ For each actor turn:
 
 2\. identify the current actor, for routing only — not to look up a persona description
 
-3\. read any explicit power-difficulty/stance/temporary-condition markers (never inferred); power difficulty is control metadata only in this iteration and is logged, not yet acted on — see \`SEMANTIC\_ARCHITECTURE.md\`
+3\. read any explicit power-difficulty/relationship/stance/temporary-condition markers (never inferred); power difficulty is room-wide, relationship is actor-to-user, and both are control metadata only in this iteration — logged, not yet acted on — see \`SEMANTIC\_ARCHITECTURE.md\`
 
 4\. inspect the latest user utterance
 
@@ -496,7 +496,7 @@ SillyTavern (owns the actor's persona: voice, cadence, dialogue examples)
 
 &#x20;   |
 
-&#x20;   | OpenAI-compatible request, carrying [ARENA_ACTOR=...], optional [ARENA_POWER=...] / [ARENA_STANCE=...] / [ARENA_CONDITION=...]
+&#x20;   | OpenAI-compatible request, carrying [ARENA_ACTOR=...], optional [ARENA_POWER=...] / [ARENA_RELATIONSHIP=...] / [ARENA_STANCE=...] / [ARENA_CONDITION=...]
 
 &#x20;   v
 
@@ -506,7 +506,9 @@ Meeting Arena Brain
 
 &#x20;   | identify actor (routing only, no persona lookup)
 
-&#x20;   | read power-difficulty marker (control metadata only in this iteration — logged, not acted on)
+&#x20;   | read power-difficulty marker, room-wide (control metadata only in this iteration — logged, not acted on)
+
+&#x20;   | read relationship marker, actor-to-user (control metadata only in this iteration — logged, not acted on)
 
 &#x20;   | read stance / temporary-condition markers (explicit, never inferred)
 

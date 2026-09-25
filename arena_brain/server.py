@@ -15,6 +15,7 @@ from arena_brain.engine import (
     find_actor_id,
     find_condition,
     find_power,
+    find_relationship,
     find_stance,
     latest_user_text,
     load_move_guidance,
@@ -88,6 +89,7 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     # yet wired into move selection, stance, condition, or rendering.
     # See SEMANTIC_ARCHITECTURE.md.
     power_name = find_power(messages)
+    relationship_name = find_relationship(messages)
     previous_move = None
     repeated_move = False
     if actor_id and selected_move:
@@ -120,10 +122,12 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
         status_code = response.status_code
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s power=%s stance=%s condition=%s selected_move=%s previous_move=%s "
-            "repeated_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s power=%s relationship=%s stance=%s condition=%s selected_move=%s "
+            "previous_move=%s repeated_move=%s latest_user=%r model=%s http_result=%s "
+            "elapsed_ms=%s",
             actor_id or "unknown",
             power_name or "none",
+            relationship_name or "none",
             stance_name or "none",
             condition_name or "none",
             selected_move.value if selected_move else "pass_through",
@@ -138,10 +142,12 @@ async def chat_completions(payload: dict[str, Any]) -> JSONResponse:
     except httpx.HTTPError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
-            "actor=%s power=%s stance=%s condition=%s selected_move=%s previous_move=%s "
-            "repeated_move=%s latest_user=%r model=%s http_result=%s elapsed_ms=%s",
+            "actor=%s power=%s relationship=%s stance=%s condition=%s selected_move=%s "
+            "previous_move=%s repeated_move=%s latest_user=%r model=%s http_result=%s "
+            "elapsed_ms=%s",
             actor_id or "unknown",
             power_name or "none",
+            relationship_name or "none",
             stance_name or "none",
             condition_name or "none",
             selected_move.value if selected_move else "pass_through",

@@ -16,6 +16,8 @@ SILLYTAVERN PERSONA          stable person + voice + examples
         +
 POWER DIFFICULTY             explicit political difficulty of the scenario/room
         +
+RELATIONSHIP / AUTHORITY     explicit formal authority: current actor → user
+        +
 STANCE                       explicit attitude toward the current proposal
         +
 TEMPORARY CONDITION          explicit short-lived modifier
@@ -27,10 +29,26 @@ LIGHTWEIGHT CONTEXT          optional rendering variation only
 REMOTE LLM                   renders one believable response
 ```
 
-**Iteration-one note:** power difficulty is defined and plumbed (parsed,
-tracked, logged) but does **not** yet feed the remote LLM or influence any
-other layer — see section 4. It sits here in the stack conceptually, ahead
-of where later iterations will wire it in.
+**Power difficulty vs. relationship — do not conflate these:** power
+difficulty is a *room-wide scenario property* (how politically difficult
+this meeting is, for everyone in it). Relationship is *actor-to-user
+metadata* (this specific actor's formal authority over the user,
+independent of the room). In one multi-person meeting these can differ per
+actor while power difficulty stays constant for the room:
+
+```
+Room power difficulty = AMBER
+  Priya  relationship = BOSS
+  Marcus relationship = PEER
+  Dana   relationship = PEER
+```
+
+**Iteration-one note:** both power difficulty and relationship are defined
+and plumbed (parsed, tracked, logged) but do **not** yet feed the remote
+LLM or influence any other layer — see section 4. They sit here in the
+stack conceptually, ahead of where later iterations will wire them in.
+`BOSS` is specifically the future activation point for Managing Up
+coaching — not implemented yet.
 
 ## 2. Ownership boundaries
 
@@ -38,6 +56,7 @@ of where later iterations will wire it in.
 |---|---|---|
 | Stable persona (who someone is, voice, cadence, normal challenge style, dialogue examples) | SillyTavern | The character card, not this repo |
 | Power difficulty (political difficulty of the scenario/room) | This repo, scenario-level control metadata (iteration one: not yet consumed downstream) | `config/power/power.yaml` |
+| Relationship / authority (current actor's formal authority over/under the user) | This repo, actor-to-user control metadata (iteration one: not yet consumed downstream) | `config/relationships/relationships.yaml` |
 | Stance (attitude toward the current proposal) | This repo, rendering overlay | `config/stances/stances.yaml` |
 | Temporary condition (what kind of day/moment the actor is having) | This repo, rendering overlay | `config/conditions/conditions.yaml` |
 | Move selection (the strategic conversational action) | This repo, deterministic Python | `arena_brain/engine.py::select_move` |
@@ -52,9 +71,9 @@ description belongs in the SillyTavern character card.
 
 ## 3. Closed vocabularies
 
-Power difficulty, stance, and temporary condition are each a small, closed,
-named vocabulary — never free text, never LLM-inferred. An unrecognised or
-missing value degrades safely to no override.
+Power difficulty, relationship, stance, and temporary condition are each a
+small, closed, named vocabulary — never free text, never LLM-inferred. An
+unrecognised or missing value degrades safely to no override.
 
 **Power difficulty** (`config/power/power.yaml`) — how politically difficult
 the scenario/room is, independent of any single actor's persona, stance, or
@@ -71,6 +90,30 @@ tracked, and logged, but must not affect move selection, stance, condition,
 repeated-move logic, or rendering, and must not inject any guidance into the
 LLM prompt. Later tasks will decide how GREEN/AMBER/RED actually affect
 simulation behaviour — do not pre-empt that here.
+
+**Relationship / authority** (`config/relationships/relationships.yaml`) —
+the current actor's formal authority relationship to the user. This is
+**actor-to-user metadata, not a room-wide scenario property** (see the
+worked example above) — do not conflate it with power difficulty:
+
+| Value | Meaning |
+|---|---|
+| `BOSS` | The current actor has direct managerial/formal authority over the user. Future activation point for Managing Up coaching — not implemented yet |
+| `PEER` | The current actor has no direct managerial authority over the user, and the user has none over them. May still differ in seniority, influence, or political standing — do not assume equal footing |
+| `DIRECT_REPORT` | The user has formal managerial authority over the current actor. Future activation point for leadership/delegation coaching — not implemented yet |
+
+The initial vocabulary is deliberately small. A senior stakeholder who
+isn't the user's boss stays `PEER` for now — power difficulty and future
+political/event tags are where influence and political threat get
+captured, not relationship. Extend this vocabulary later only if real
+scenarios prove it too coarse.
+
+**Iteration-one rule:** `ARENA_RELATIONSHIP` is control metadata only, same
+as power difficulty. It is parsed, tracked, and logged, but must not affect
+move selection, stance, condition, power difficulty, repeated-move logic,
+or rendering, and must not inject any guidance into the LLM prompt. `BOSS`
+will later be an input to Managing Up coaching — that behaviour is not
+implemented here.
 
 **Stance** (`config/stances/stances.yaml`) — the actor's attitude toward the
 current proposal/discussion, independent of their stable personality:
@@ -103,6 +146,10 @@ not replace the person with a caricature.
   repeated-move logic, or rendering.** It is parsed and logged (`power=...`)
   and nothing else for now — pure control metadata, established ahead of the
   later task that decides how it actually affects behaviour.
+- **Relationship does not change move selection, stance, condition, power
+  difficulty, repeated-move logic, or rendering.** It is parsed and logged
+  (`relationship=...`) and nothing else for now. `BOSS` will later gate
+  Managing Up coaching — not yet.
 - **Stance does not change move selection.** Temporary condition does not
   change move selection. They only change how the selected move is
   expressed.
@@ -132,15 +179,16 @@ content, e.g.:
 ```
 [ARENA_ACTOR=priya]
 [ARENA_POWER=amber]
+[ARENA_RELATIONSHIP=boss]
 [ARENA_STANCE=sceptical]
 [ARENA_CONDITION=frazzled]
 ```
 
-The brain detects these (`find_actor_id`, `find_power`, `find_stance`,
-`find_condition`) and strips them (`strip_actor_markers`) before the
-conversation is forwarded upstream — they are plumbing, never dialogue. An
-empty value (`[ARENA_STANCE=]`), a missing marker, or an unrecognised name
-all degrade safely to no override, not an error.
+The brain detects these (`find_actor_id`, `find_power`, `find_relationship`,
+`find_stance`, `find_condition`) and strips them (`strip_actor_markers`)
+before the conversation is forwarded upstream — they are plumbing, never
+dialogue. An empty value (`[ARENA_STANCE=]`), a missing marker, or an
+unrecognised name all degrade safely to no override, not an error.
 
 SillyTavern owns the user-facing control surface that sets these markers
 (Quick Reply buttons / chat variables in the current MVP direction). No
@@ -161,6 +209,16 @@ Do **not**:
   repeated-move logic, rendering, or Coach behaviour until a later task
   explicitly authorises it. Iteration one is parsing, tracking, and logging
   only.
+- Let relationship influence move selection, stance, condition, power
+  difficulty, repeated-move logic, rendering, or Coach behaviour until a
+  later task explicitly authorises it — including Managing Up coaching for
+  `BOSS`. Iteration one is parsing, tracking, and logging only.
+- Conflate relationship (actor-to-user authority) with power difficulty
+  (room-wide political difficulty). They are independent and must stay
+  that way in code, config, and prompts.
+- Add `SENIOR_STAKEHOLDER` or any other relationship value beyond
+  `BOSS`/`PEER`/`DIRECT_REPORT` without a real scenario proving the current
+  vocabulary is too coarse.
 - Make "difficult" behaviour synonymous with hostility.
 - Create one persona per stance/condition combination.
 - Introduce session storage solely to support repeat-move behaviour.
